@@ -14,6 +14,9 @@ npx playwright install chromium   # for the browser suites
 npm run check                     # lint, unit, e2e, real DevTools
 ```
 
+`npm test` needs `zip` and `unzip` on the `PATH` (the pack test builds the zip and lists it) and
+rewrites `dist/` on every run.
+
 Load the repository folder as an unpacked extension (`chrome://extensions` → Developer mode →
 Load unpacked) to try changes in a real browser. Reload the extension after edits, then close
 and reopen DevTools. `npm run stamp` writes a git-ignored `src/build-info.js`, and the version

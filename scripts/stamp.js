@@ -5,9 +5,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = path.join(import.meta.dirname, '..');
-const git = (...args) => execFileSync('git', ['rev-parse', ...args], { cwd: root, encoding: 'utf8' }).trim();
-const commit = git('HEAD');
-const branch = git('--abbrev-ref', 'HEAD'); // "HEAD" when detached
+const git = (...args) => execFileSync('git', ['rev-parse', ...args], { cwd: root, encoding: 'utf8', stdio: 'pipe' }).trim();
+let commit, branch;
+try {
+  commit = git('HEAD');
+  branch = git('--abbrev-ref', 'HEAD'); // "HEAD" when detached
+} catch {
+  console.error('stamp: not a git checkout');
+  process.exit(1);
+}
 const time = new Date().toISOString();
 const q = (s) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 

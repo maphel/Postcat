@@ -944,6 +944,19 @@ function ok(name, condition, detail) {
   await plain.waitForLoadState('networkidle');
   check('a missing build stamp logs no console error', plainConsole, []);
   await plain.close();
+  // The package lookup degrades to the plain version line when the API is missing, hands back
+  // nothing, or throws: no page error, no console error.
+  for (const [name, init] of [
+    ['API missing', 'chrome.runtime.getPackageDirectoryEntry = undefined;'],
+    ['callback without an entry', 'chrome.runtime.getPackageDirectoryEntry = (cb) => setTimeout(() => cb(undefined), 0);'],
+    ['API throws', 'chrome.runtime.getPackageDirectoryEntry = () => { throw new Error("boom"); };'],
+  ]) {
+    const { page: broken, errors: brokenErrors, consoleErrors: brokenConsole } = await openPanel(ctx, id, { width: 1300, height: 600, init });
+    await broken.waitForFunction((v) => document.getElementById('versionLine').textContent === `Postcat ${v}`, MANIFEST_VERSION);
+    await broken.waitForLoadState('networkidle');
+    check(`build lookup with ${name}: plain version line, no errors`, [await broken.textContent('#versionLine'), brokenErrors, brokenConsole], [`Postcat ${MANIFEST_VERSION}`, [], []]);
+    await broken.close();
+  }
   // With `npm run stamp` (src/build-info.js in the loaded folder): commit, branch and local HH:MM of the stamp, the full commit in the tooltip.
   const stamp = { commit: 'e176965abcdef0123456789abcdef0123456789a', short: 'e176965', branch: 'feat/foo', time: '2026-09-23T17:42:00.000Z' };
   fs.writeFileSync(path.join(dir, 'src', 'build-info.js'), `export default ${JSON.stringify(stamp)};\n`);

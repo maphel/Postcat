@@ -181,19 +181,27 @@ $('appearance').addEventListener('click', (e) => {
 // stamped with `npm run stamp` (git-ignored, excluded from the zip): then the line also names the
 // commit, branch and stamp time, so a reloaded unpacked extension shows which code is running.
 $('versionLine').textContent = `Postcat ${chrome.runtime.getManifest().version}`;
+// Look the file up in the package before importing it: importing a missing module rejects (caught)
+// but Chrome still logs the failed load in the console of every unstamped panel. Anything odd on the
+// way (API missing or throwing, no directory entry) degrades to the plain version line, silently.
 const importStamp = () => import('../build-info.js').then((m) => m.default, () => null);
-// Look the file up in the package first: importing a missing module rejects (caught) but Chrome
-// still logs the failed load in the console of every unstamped panel.
 new Promise((resolve) => {
-  if (!chrome.runtime.getPackageDirectoryEntry) return resolve(importStamp());
-  chrome.runtime.getPackageDirectoryEntry((pkg) => pkg.getFile('src/build-info.js', {}, () => resolve(importStamp()), () => resolve(null)));
-}).then((build) => {
+  if (typeof chrome.runtime.getPackageDirectoryEntry !== 'function') return resolve(null);
+  chrome.runtime.getPackageDirectoryEntry((pkg) => {
+    try {
+      if (typeof pkg?.getFile !== 'function') return resolve(null);
+      pkg.getFile('src/build-info.js', {}, () => resolve(importStamp()), () => resolve(null));
+    } catch {
+      resolve(null);
+    }
+  });
+}).catch(() => null).then((build) => {
   if (!build?.commit) return;
   const stamped = new Date(build.time);
   const hhmm = Number.isNaN(stamped.getTime()) ? '' : stamped.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
   $('versionLine').textContent = [`Postcat ${chrome.runtime.getManifest().version}`, build.short || build.commit.slice(0, 7), build.branch, hhmm].filter(Boolean).join(' · ');
   $('versionLine').title = `Commit ${build.commit}${build.time ? ` · stamped ${build.time}` : ''}`;
-});
+}).catch(() => {}); // a malformed stamp is not worth an error
 
 $('filterInput').addEventListener('input', (e) => setFilter(e.target.value));
 $('collection').addEventListener('click', (e) => {

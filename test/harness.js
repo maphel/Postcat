@@ -43,14 +43,15 @@ export async function launch(dir) {
 // (`consoleErrors`, including failed resource loads). `harEntry` is installed as a page global before
 // the panel boots, so page.evaluate() callbacks can call it under the same name as the import and
 // hand the result to __emit().
-export async function openPanel(ctx, id, { width, height }) {
+// `init` (optional JS source) runs before the panel boots, e.g. to break a chrome API on purpose.
+export async function openPanel(ctx, id, { width, height, init = '' }) {
   const page = await ctx.newPage();
   const errors = [];
   const consoleErrors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
   await page.setViewportSize({ width, height });
-  await page.addInitScript(`window.harEntry = ${harEntry};`);
+  await page.addInitScript(`window.harEntry = ${harEntry};\n${init}`);
   await page.goto(`chrome-extension://${id}/src/harness.html`);
   return { page, errors, consoleErrors };
 }
