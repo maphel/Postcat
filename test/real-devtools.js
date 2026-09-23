@@ -14,6 +14,7 @@ const EXT = path.join(import.meta.dirname, '..');
 const PORT = 8777;
 const CDP_PORT = 9333;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const chromeLog = []; // Chrome's stdout/stderr, printed when a target never shows up
 
 const PNG_1x1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
@@ -67,13 +68,14 @@ const targets = async () => {
     return []; // Chrome is still starting
   }
 };
-async function waitForTarget(pred) {
-  for (let i = 0; i < 50; i++) {
+async function waitForTarget(pred, label = 'target') {
+  for (let i = 0; i < 150; i++) {
     const t = (await targets()).find(pred);
     if (t) return t;
     await sleep(200);
   }
-  throw new Error('target not found');
+  const seen = (await targets()).map((t) => `${t.type} ${t.url}`).join('\n  ') || '(none)';
+  throw new Error(`${label} not found after 30 s; targets:\n  ${seen}\nchrome output:\n${chromeLog.join('')}`);
 }
 
 // Clicks every list item (re-querying, the list re-renders) and returns "METHOD url => body".
@@ -94,11 +96,15 @@ const READ_LIST = `(async () => {
   const proc = spawn(CHROME, [
     '--headless=new', `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${profile}`,
     `--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`,
-    '--auto-open-devtools-for-tabs', '--no-first-run', `http://localhost:${PORT}/`,
-  ], { stdio: 'ignore' });
+    '--auto-open-devtools-for-tabs', '--no-first-run', '--disable-gpu',
+    ...(process.platform === 'linux' ? ['--no-sandbox'] : []), // CI containers
+    `http://localhost:${PORT}/`,
+  ], { stdio: ['ignore', 'pipe', 'pipe'] });
+  proc.stdout.on('data', (d) => chromeLog.push(String(d)));
+  proc.stderr.on('data', (d) => chromeLog.push(String(d)));
 
   try {
-    const devtoolsPage = await waitForTarget((t) => t.url.endsWith('/devtools.html'));
+    const devtoolsPage = await waitForTarget((t) => t.url.endsWith('/devtools.html'), 'devtools page');
     const extId = devtoolsPage.url.split('/')[2];
     const pageUrl = (t) => t.type === 'page' && t.url.startsWith(`http://localhost:${PORT}`);
     let page = await connect((await waitForTarget(pageUrl)).webSocketDebuggerUrl);
