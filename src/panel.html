@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="toolbar">
+      <button id="recordBtn" class="record ghost" title="Start/stop recording"><span class="dot"></span><span id="recordLabel">Recording</span></button>
+      <button id="importBtn" class="ghost" title="Add everything DevTools logged before this panel was opened">Import log</button>
+      <button id="clearBtn" class="ghost" title="Remove all captured requests">Clear</button>
+      <button id="newListBtn" class="ghost push" title="New empty request">+ New</button>
+    </div>
+    <div class="toolbar">
+      <input id="filterInput" type="search" placeholder="Filter — text or /regex/" title="Press / to focus" spellcheck="false">
+      <label class="check" title="Record only XHR/fetch requests (no images, scripts, CSS)"><input type="checkbox" id="xhrOnly" checked> XHR/Fetch</label>
+    </div>
+    <div class="tabs" id="listTabs">
+      <button data-tab="captured" class="active">Captured <span id="capturedCount" class="count"></span></button>
+      <button data-tab="saved">Saved <span id="savedCount" class="count"></span></button>
+    </div>
+    <ul id="requestList" class="list"></ul>
+  </aside>
+
+  <div class="resizer" id="sidebarResizer" title="Drag to resize · double-click to reset"></div>
+
+  <main class="main">
+    <div id="emptyState" class="empty">
+      <img src="../icons/icon128.png" alt="" width="56" height="56">
+      <h2>Postcat</h2>
+      <p>Requests from this tab show up on the left.<br>Pick one to edit it and send it again.</p>
+      <dl class="shortcuts">
+        <dt><kbd>⌘/Ctrl</kbd> <kbd>Enter</kbd></dt><dd>Send</dd>
+        <dt><kbd>⌘/Ctrl</kbd> <kbd>S</kbd></dt><dd>Save</dd>
+        <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Move through the list</dd>
+        <dt><kbd>/</kbd></dt><dd>Filter</dd>
+        <dt><kbd>⌘/Ctrl</kbd> <kbd>F</kbd></dt><dd>Search the response</dd>
+        <dt><kbd>Del</kbd></dt><dd>Delete (with undo)</dd>
+      </dl>
+      <button id="newBtn" class="primary">New request</button>
+      <p class="hint">Tip: paste a cURL command anywhere to import it.</p>
+    </div>
+
+    <div id="editor" class="editor" hidden>
+      <div class="urlbar">
+        <select id="method" title="HTTP method"></select>
+        <input id="url" spellcheck="false" placeholder="Enter a URL or paste a cURL command" title="Enter sends">
+        <button id="sendBtn" class="primary" title="Send (Enter in the URL field, or ⌘/Ctrl + Enter)">Send</button>
+      </div>
+
+      <div class="actions">
+        <input id="name" placeholder="Request name" spellcheck="false" title="Name in your collection">
+        <span id="info" class="info"></span>
+        <span class="push"></span>
+        <button id="resetBtn" class="ghost" title="Restore the request as it was recorded">↺ Reset</button>
+        <button id="saveBtn" class="ghost" title="Save to collection (⌘/Ctrl + S)">☆ Save</button>
+        <button id="dupBtn" class="ghost" title="Duplicate">⧉ Duplicate</button>
+        <button id="curlBtn" class="ghost" title="Copy as cURL">⌘ cURL</button>
+        <button id="deleteBtn" class="ghost danger" title="Delete (Del)">✕</button>
+      </div>
+
+      <div class="split" id="split">
+        <section class="pane">
+          <div class="tabs" id="reqTabs">
+            <button data-tab="params">Params <span id="reqParamCount" class="count"></span></button>
+            <button data-tab="headers">Headers <span id="reqHeaderCount" class="count"></span></button>
+            <button data-tab="body">Body <span id="reqBodyMark" class="dotmark"></span></button>
+            <span class="push"></span>
+            <button id="bulkBtn" class="link" title="Switch between table and plain text">Bulk edit</button>
+            <button id="beautifyBtn" class="link" title="Format JSON body">{ } Beautify</button>
+          </div>
+          <div id="paramsView" class="kv scroll"></div>
+          <div id="headersView" class="kv scroll"></div>
+          <textarea id="headers" class="editor-text" spellcheck="false" placeholder="Name: value — one per line, # disables a line"></textarea>
+          <textarea id="body" class="editor-text" spellcheck="false" placeholder="Request body (ignored for GET/HEAD)"></textarea>
+          <div id="bodyStatus" class="status-line" hidden></div>
+        </section>
+
+        <div class="resizer" id="splitResizer" title="Drag to resize · double-click to reset"></div>
+
+        <section class="pane">
+          <div class="tabs" id="resTabs">
+            <button data-tab="resBody" class="active">Response</button>
+            <button data-tab="resHeaders">Headers <span id="resHeaderCount" class="count"></span></button>
+            <span class="push"></span>
+            <span id="searchCount" class="search-count" hidden></span>
+            <span id="resSource" class="segmented" hidden>
+              <button data-view="recorded" title="Response recorded from the page">Recorded</button>
+              <button data-view="sent" title="Response to your last send">Sent</button>
+            </span>
+            <span id="resMode" class="segmented" hidden>
+              <button data-mode="preview" title="Rendered preview">Preview</button>
+              <button data-mode="raw" title="Source text or hex dump">Raw</button>
+            </span>
+            <span id="resStatus" class="pill"></span>
+            <span id="resTime" class="meta"></span>
+            <span id="resSize" class="meta"></span>
+            <button id="copyResBtn" class="link" title="Copy response body">Copy</button>
+            <button id="saveResBtn" class="link" title="Save response body as a file">Save</button>
+          </div>
+          <div id="resRedirect" class="redirect" hidden></div>
+          <div id="resBodyWrap" class="body-wrap">
+            <pre id="resBody" class="output scroll"></pre>
+            <div id="resPreview" class="preview" hidden></div>
+          </div>
+          <div id="resHeaders" class="output headers-grid scroll" hidden></div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast" class="toast" role="status">
+  <span id="toastText"></span>
+  <button id="toastAction" class="link" hidden></button>
+</div>
+
+<script type="module" src="panel/main.js"></script>
+</body>
+</html>

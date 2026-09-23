@@ -1,0 +1,26 @@
+{
+  "name": "postcat",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome DevTools extension: capture, edit and replay network requests.",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "test:e2e": "node test/e2e.js",
+    "test:real": "node test/real-devtools.js",
+    "lint": "eslint .",
+    "check": "npm run lint && npm test && npm run test:e2e && npm run test:real",
+    "pack": "node scripts/pack.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
+    "playwright": "^1.50.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maphel/Postcat.git"
+  }
+}
