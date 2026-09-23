@@ -1,0 +1,158 @@
+<style>
+#pcdock{--p-bg:light-dark(#fff,#202124);--p-side:light-dark(#f7f8fa,#24262a);--p-bar:light-dark(#f0f2f5,#292b30);--p-text:light-dark(#272a30,#e8eaed);--p-muted:light-dark(#606975,#b1b8c3);--p-border:light-dark(#dfe3e9,#3b3e45);--p-blue:light-dark(#1767ce,#9bbfff);--p-onblue:light-dark(#fff,#172b49);--p-select:light-dark(#e8f0fc,#33425a);--p-green:light-dark(#237447,#91cba7);--p-string:light-dark(#92581e,#deb087);--p-red:light-dark(#ba3447,#ef8c97);--p-hover:light-dark(#e9edf2,#353840);--p-field:light-dark(#fff,#292c31);--p-shadow:light-dark(#15223a20,#00000050);color-scheme:inherit;font:12px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--p-text);width:100%;max-width:1024px;height:320px;container:postcat / size;isolation:isolate}
+#pcdock *{box-sizing:border-box}#pcdock [hidden]{display:none!important}
+#pcdock .window{height:100%;display:flex;flex-direction:column;background:var(--p-bg);border:1px solid var(--p-border);border-radius:8px;overflow:hidden}
+#pcdock :is(button,input,select,textarea){font:inherit;color:inherit;color-scheme:inherit}
+#pcdock button{display:inline-flex;align-items:center;justify-content:center;gap:5px;flex-shrink:0;background:transparent;border:1px solid transparent;border-radius:4px;min-height:26px;padding:3px 7px;white-space:nowrap;line-height:18px;cursor:default}
+#pcdock button:hover:not(:disabled){background:var(--p-hover)}#pcdock button:disabled{opacity:.45}
+#pcdock :is(button,input,select,textarea):focus-visible{outline:2px solid var(--p-blue);outline-offset:-2px}
+#pcdock svg{display:block;width:14px;height:14px;flex:0 0 14px;stroke-width:1.75}
+#pcdock .icon{width:26px;padding:5px}#pcdock .grow{flex:1;min-width:0}#pcdock .muted{color:var(--p-muted)}
+#pcdock .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#pcdock .chrome{height:29px;min-height:29px;display:flex;align-items:center;gap:18px;padding:0 10px;background:var(--p-bar);border-bottom:1px solid var(--p-border);font-size:11px;color:var(--p-muted)}
+#pcdock .chrome .active{display:flex;align-items:center;height:29px;border-bottom:2px solid var(--p-blue);color:var(--p-blue)}
+#pcdock select{background:var(--p-field);border:1px solid var(--p-border);border-radius:4px;min-height:24px;padding:2px 5px;font-size:11px}
+#pcdock select option{background:var(--p-bg);color:var(--p-text)}
+#pcdock .quiet{border-color:transparent;background:transparent;color:var(--p-muted)}
+#pcdock .appearance{display:flex;align-items:center;gap:3px}#pcdock .appearance svg{width:12px;height:12px;flex-basis:12px}
+#pcdock .layout{display:grid;grid-template-columns:214px minmax(0,1fr);flex:1;min-height:0}
+#pcdock aside{background:var(--p-side);border-right:1px solid var(--p-border);display:flex;flex-direction:column;min-height:0;min-width:0}
+#pcdock .list-tools{display:flex;align-items:center;gap:3px;padding:3px 6px;min-height:34px;height:34px;border-bottom:1px solid var(--p-border)}
+#pcdock .list-tools select{font-size:12px;font-weight:500;color:var(--p-text);padding-left:3px;max-width:120px}
+#pcdock .record{width:24px;padding:5px}#pcdock .record-dot{display:block;width:7px;height:7px;border-radius:50%;background:var(--p-red)}
+#pcdock .record[aria-pressed=false] .record-dot{background:var(--p-muted);border-radius:1px}
+#pcdock .list-filter{display:flex;align-items:center;gap:4px;padding:3px 6px;min-height:32px;height:32px;border-bottom:1px solid var(--p-border)}
+#pcdock .search{display:flex;align-items:center;gap:5px;min-width:0;flex:1;color:var(--p-muted)}
+#pcdock .search svg{width:12px;height:12px;flex-basis:12px}
+#pcdock .search input{min-width:0;width:100%;height:24px;padding:3px 0;border:0;background:transparent;font-size:11px}
+#pcdock input::placeholder,#pcdock textarea::placeholder{color:var(--p-muted);opacity:1}
+#pcdock .filter-button[aria-pressed=true]{color:var(--p-blue);background:var(--p-select)}
+#pcdock .list{min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--p-border) transparent;flex:1;padding:3px 0}
+#pcdock .row{display:grid;grid-template-columns:37px minmax(0,1fr) 25px;gap:5px;align-items:center;width:100%;text-align:left;justify-content:initial;min-height:28px;height:28px;padding:3px 8px;border-radius:0;border:0;font-size:11px}
+#pcdock .row[aria-pressed=true]{background:var(--p-select)}#pcdock .row[aria-pressed=true]:hover{background:var(--p-select)}
+#pcdock .method{font:500 11px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--p-green)}#pcdock .method.write{color:var(--p-string)}
+#pcdock .path{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}#pcdock .row-status{font-size:11px;color:var(--p-muted);font-variant-numeric:tabular-nums;text-align:right}
+#pcdock main{min-width:0;min-height:0;display:flex;flex-direction:column;position:relative}
+#pcdock .context{display:none;align-items:center;padding:2px 6px;gap:6px;min-height:32px;height:32px;border-bottom:1px solid var(--p-border)}
+#pcdock .context-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--p-muted);font-size:11px;flex:1}
+#pcdock .urlbar{display:flex;align-items:center;gap:5px;padding:5px 8px;min-height:39px;height:39px;border-bottom:1px solid var(--p-border)}
+#pcdock .address{min-width:0;flex:1;display:flex;align-items:center;border:1px solid var(--p-border);border-radius:5px;background:var(--p-field);height:28px}
+#pcdock .address select{height:26px;min-height:26px;min-width:65px;max-width:82px;border:0;border-right:1px solid var(--p-border);border-radius:4px 0 0 4px;background:transparent;color:var(--p-green);font-size:11px;padding:3px 6px}
+#pcdock .address input{width:100%;min-width:0;height:26px;border:0;border-radius:0 4px 4px 0;background:transparent;padding:4px 7px;font:11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}
+#pcdock .send{background:var(--p-blue);color:var(--p-onblue);padding:3px 10px;min-width:52px;height:28px;font-weight:500}
+#pcdock .send:hover:not(:disabled){background:var(--p-blue);filter:brightness(.95)}
+#pcdock .saved{color:var(--p-blue);background:var(--p-select)}
+#pcdock .switcher{display:none;align-items:center;gap:16px;border-bottom:1px solid var(--p-border);padding:0 10px;min-height:31px;height:31px}
+#pcdock .switcher button{border:0;border-bottom:2px solid transparent;border-radius:0;min-height:31px;height:31px;padding:4px 0;color:var(--p-muted)}
+#pcdock .switcher button[aria-pressed=true]{border-bottom-color:var(--p-blue);color:var(--p-text)}
+#pcdock .panes{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);flex:1;min-height:0}
+#pcdock .request-pane,#pcdock .response-pane{min-width:0;min-height:0;display:flex;flex-direction:column}
+#pcdock .request-pane{border-right:1px solid var(--p-border)}
+#pcdock .pane-head{display:flex;align-items:center;gap:12px;padding:0 9px;min-height:31px;height:31px;border-bottom:1px solid var(--p-border);white-space:nowrap}
+#pcdock .pane-head button{padding:4px 0;min-height:31px;height:31px;border:0;border-bottom:2px solid transparent;border-radius:0;font-size:11px;color:var(--p-muted);gap:3px}
+#pcdock .pane-head button[aria-pressed=true]{border-bottom-color:var(--p-blue);color:var(--p-text)}
+#pcdock .pane-head button:hover{background:transparent;color:var(--p-text)}
+#pcdock .count{font-size:11px;color:var(--p-muted);font-variant-numeric:tabular-nums}
+#pcdock .response-tabs{display:flex;align-items:center;gap:12px;flex-shrink:0}#pcdock .response-head{gap:8px}#pcdock .response-head strong{font-size:12px;font-weight:500}
+#pcdock .response-head .source{margin-left:auto;max-width:88px;padding:1px 4px}
+#pcdock .success{font-size:11px;color:var(--p-green);white-space:nowrap}
+#pcdock .time{font-size:11px;color:var(--p-muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+#pcdock .scroll{min-height:0;flex:1;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--p-border) transparent}
+#pcdock .editor{padding:0 9px 9px}
+#pcdock table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:11px}
+#pcdock th{font-weight:400;color:var(--p-muted);text-align:left;padding:6px 3px;border-bottom:1px solid var(--p-border)}
+#pcdock td{padding:3px;border-bottom:1px solid var(--p-border);overflow-wrap:anywhere}
+#pcdock .enabled{width:22px}#pcdock input[type=checkbox]{width:12px;height:12px;accent-color:var(--p-blue);margin:0;vertical-align:middle}
+#pcdock td input[type=text]{width:100%;min-width:0;padding:4px 1px;background:transparent;border:0;border-radius:3px;font:11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}
+#pcdock .add{font-size:11px;color:var(--p-muted);padding:3px 1px;margin-top:4px}
+#pcdock textarea{display:block;width:100%;min-height:120px;resize:vertical;border:0;background:transparent;padding:8px 0;font:11px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace}
+#pcdock .note{padding:14px 0;margin:0;font-size:11px;color:var(--p-muted)}
+#pcdock .code{padding:9px 11px 14px;font:11px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;color:var(--p-text)}
+#pcdock .key{color:var(--p-blue)}#pcdock .string{color:var(--p-string)}
+#pcdock .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:4px;padding:16px;font-size:11px;color:var(--p-muted);min-height:80px}
+#pcdock .empty strong{font-size:12px;font-weight:500;color:var(--p-text)}
+#pcdock .menu-anchor{position:relative;flex-shrink:0}
+#pcdock .menu{position:absolute;right:0;top:30px;z-index:5;background:var(--p-bg);border:1px solid var(--p-border);box-shadow:0 5px 20px var(--p-shadow);border-radius:7px;padding:4px;min-width:165px}
+#pcdock .menu button{width:100%;text-align:left;justify-content:flex-start;font-size:11px;padding:4px 7px}
+#pcdock .menu label{display:flex;align-items:center;gap:8px;padding:6px 7px;font-size:11px}
+#pcdock .menu hr{border:0;height:1px;background:var(--p-border);margin:3px}
+#pcdock .feedback{position:absolute;bottom:6px;left:8px;right:8px;z-index:4;display:flex;align-items:center;gap:6px;border:1px solid var(--p-border);border-radius:6px;padding:5px 8px;background:var(--p-bg);box-shadow:0 3px 15px var(--p-shadow);font-size:11px}
+#pcdock .feedback .text{flex:1;min-width:0}
+@supports(appearance:base-select){#pcdock select,#pcdock select::picker(select){appearance:base-select}#pcdock select{display:flex;align-items:center;gap:5px}#pcdock select::picker-icon{color:var(--p-muted);font-size:9px}#pcdock select::picker(select){background:var(--p-bg);color:var(--p-text);border:1px solid var(--p-border);border-radius:7px;padding:4px;box-shadow:0 5px 20px var(--p-shadow);min-width:130px;margin-top:3px;font:12px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#pcdock option{padding:4px 8px;min-height:27px;border-radius:4px;gap:7px}#pcdock option:checked{background:var(--p-select);color:var(--p-blue)}#pcdock option:hover{background:var(--p-hover)}}
+@container postcat (max-width:849px){#pcdock .layout{grid-template-columns:205px minmax(0,1fr)}#pcdock .panes{display:flex;flex-direction:column}#pcdock .switcher{display:flex}#pcdock .request-pane{border:0;flex:1}#pcdock .response-pane{flex:1}#pcdock main[data-view=response] .request-pane{display:none}#pcdock main[data-view=request] .response-pane{display:none}#pcdock .chrome{gap:14px}#pcdock .domain{display:none}#pcdock .response-head{gap:10px}}
+@container postcat (max-width:579px){#pcdock .layout{display:flex}#pcdock aside{display:none;width:100%;border-right:0}#pcdock main{width:100%}#pcdock .layout[data-screen=list] aside{display:flex}#pcdock .layout[data-screen=list] main{display:none}#pcdock .context{display:flex}#pcdock .desktop-save{display:none}#pcdock .chrome{gap:12px}#pcdock .chrome>svg{display:none}#pcdock .appearance svg{display:none}#pcdock .list-tools select{max-width:none}#pcdock .list-tools{padding-left:9px;padding-right:9px}#pcdock .list-filter{padding-left:10px;padding-right:9px}#pcdock .row{height:31px;min-height:31px;padding-left:11px;padding-right:11px}#pcdock .context .back{padding-left:1px}#pcdock .urlbar{padding-left:7px;padding-right:7px}#pcdock .address select{min-width:64px}#pcdock .list-new{width:auto;padding:3px 8px}#pcdock .list-new .new-label{display:inline}#pcdock .context-name{max-width:none}}
+#pcdock .new-label{display:none}
+@container postcat (max-width:350px){#pcdock .chrome{gap:9px;padding:0 8px}#pcdock .chrome .optional-tab{display:none}#pcdock .time{display:none}#pcdock .context-name{max-width:105px}#pcdock .urlbar{gap:4px}#pcdock .send{min-width:48px;padding:3px 7px}}
+@media(pointer:coarse){#pcdock button,#pcdock select{min-height:36px}#pcdock .chrome{height:36px;min-height:36px}#pcdock .urlbar{height:47px;min-height:47px}#pcdock .address{height:36px}#pcdock .address input{height:34px;font-size:16px}#pcdock .list-tools,#pcdock .list-filter,#pcdock .context{height:42px;min-height:42px}#pcdock .switcher,#pcdock .pane-head{height:40px;min-height:40px}#pcdock .row{height:40px;min-height:40px}#pcdock .icon{width:36px}#pcdock .search input{font-size:16px;height:34px}}
+</style>
+<div id="pcdock" aria-label="Postcat — compact docked panel">
+  <div class="window">
+    <div class="chrome"><i data-lucide="panel-top" aria-hidden="true"></i><span class="optional-tab">Elements</span><span>Console</span><span>Network</span><span class="active">Postcat</span><span class="grow"></span><span class="domain">shop.example.com</span><label class="appearance"><i data-lucide="sun-moon" aria-hidden="true"></i><span class="sr">Appearance</span><select class="quiet" id="pd-theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label></div>
+    <div class="layout" data-screen="detail">
+      <aside aria-label="Request list">
+        <div class="list-tools"><label><span class="sr">Request collection</span><select class="quiet" id="pd-collection"><option value="captured">Captured · 12</option><option value="saved">Saved · 1</option></select></label><span class="grow"></span><button class="record" id="pd-record" aria-pressed="true" aria-label="Pause recording" data-tooltip="Pause recording"><span class="record-dot"></span></button><button class="icon list-new" id="pd-new" aria-label="New request" data-tooltip="New request"><i data-lucide="plus" aria-hidden="true"></i><span class="new-label">New</span></button></div>
+        <div class="list-filter"><label class="search"><i data-lucide="search" aria-hidden="true"></i><input id="pd-filter" type="search" aria-label="Filter requests" placeholder="Filter requests" spellcheck="false"></label><div class="menu-anchor"><button class="icon filter-button" id="pd-filter-menu" aria-label="Capture options" aria-pressed="true" aria-expanded="false" data-tooltip="XHR / Fetch only"><i data-lucide="list-filter" aria-hidden="true"></i></button><div class="menu" id="pd-options" hidden><label><input type="checkbox" id="pd-api" checked>XHR / Fetch only</label></div></div></div>
+        <div class="list" id="pd-list"></div>
+      </aside>
+      <main data-view="request">
+        <div class="context"><button class="back" id="pd-back"><i data-lucide="chevron-left" aria-hidden="true"></i>Requests <span class="count" id="pd-total">12</span></button><span class="context-name" id="pd-name">/api/products</span><button class="icon" id="pd-narrow-new" aria-label="New request" data-tooltip="New request"><i data-lucide="plus" aria-hidden="true"></i></button><button class="icon" data-save aria-label="Save request" data-tooltip="Save request"><i data-lucide="bookmark" aria-hidden="true"></i></button></div>
+        <div class="urlbar"><div class="address"><select id="pd-method" aria-label="HTTP method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option></select><input id="pd-url" aria-label="Request URL" value="https://shop.example.com/api/products?limit=20" placeholder="Enter a URL" spellcheck="false"></div><button class="send" id="pd-send">Send</button><button class="icon desktop-save" data-save aria-label="Save request" data-tooltip="Save request"><i data-lucide="bookmark" aria-hidden="true"></i></button><div class="menu-anchor"><button class="icon" id="pd-more" aria-label="More actions" aria-expanded="false"><i data-lucide="ellipsis" aria-hidden="true"></i></button><div class="menu" id="pd-actions" hidden><button id="pd-reset"><i data-lucide="rotate-ccw" aria-hidden="true"></i>Reset request</button><button id="pd-duplicate"><i data-lucide="copy" aria-hidden="true"></i>Duplicate request</button><hr><button id="pd-response-mode"><i data-lucide="code" aria-hidden="true"></i>Show raw response</button></div></div></div>
+        <div class="switcher" role="group" aria-label="Detail view"><button data-view="request" aria-pressed="true">Request</button><button data-view="response" aria-pressed="false">Response <span class="success" id="pd-switch-status">200</span></button><span class="grow"></span><span class="muted" id="pd-edited" hidden>Edited</span></div>
+        <div class="panes">
+          <section class="request-pane" aria-label="Request editor"><div class="pane-head" id="pd-tabs" role="group" aria-label="Request fields"><button data-tab="params" aria-pressed="true">Params <span class="count" id="pd-param-count">1</span></button><button data-tab="headers" aria-pressed="false">Headers <span class="count">2</span></button><button data-tab="body" aria-pressed="false">Body</button></div><div class="scroll editor" id="pd-editor"></div></section>
+          <section class="response-pane" aria-label="Response"><div class="pane-head response-head"><div class="response-tabs" role="group" aria-label="Response content"><button id="pd-response-body-tab" data-response="body" aria-pressed="true" aria-controls="pd-response">Body</button><button id="pd-response-headers-tab" data-response="headers" aria-pressed="false" aria-controls="pd-response">Headers</button></div><span class="success" id="pd-status">200 OK</span><span class="time" id="pd-time">124 ms</span><label class="source"><span class="sr">Response source</span><select class="quiet source" id="pd-source"><option value="recorded">Recorded</option><option value="sent" disabled>Sent</option></select></label></div><div class="scroll" id="pd-response"></div></section>
+        </div>
+        <div class="feedback" id="pd-feedback" role="status" aria-live="polite" hidden><span class="text" id="pd-message"></span><button class="icon" id="pd-dismiss" aria-label="Dismiss message"><i data-lucide="x" aria-hidden="true"></i></button></div>
+      </main>
+    </div>
+  </div>
+</div>
+<script>
+(()=>{
+const root=document.getElementById('pcdock'),$=s=>root.querySelector(s),$$=s=>Array.from(root.querySelectorAll(s));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clone=x=>JSON.parse(JSON.stringify(x));const icons=()=>{if(globalThis.lucide)lucide.createIcons({attrs:{width:14,height:14}})};
+let seq=20,selected=1,tab='params',mode='preview',bodyMode='preview',timer=null;
+const paths=['/api/products?limit=20','/api/products/1042','/api/cart','/api/session','/api/categories','/api/recommendations','/api/preferences','/api/shipping','/api/cart/items','/api/notifications','/api/availability','/api/prices'];
+function make(path,method='GET',id=seq++){const url=path?'https://shop.example.com'+path:'';return{id,url,method,original:{url,method},params:path?Array.from(new URL(url).searchParams,([key,value])=>({key,value,enabled:true})):[],headers:[{key:'Accept',value:'application/json',enabled:true},{key:'Content-Type',value:'application/json',enabled:true}],body:method==='POST'?'{\n  "product_id": 1042,\n  "quantity": 2\n}':'',saved:id===2,recorded:path?{products:[{id:1042,name:'Studio headphones',price:149,currency:'EUR'}],total:24,limit:20}:null,sent:null,source:path?'recorded':'sent',edited:false}}
+const items=paths.map((path,i)=>make(path,i===2||i===8?'POST':'GET',i+1));
+items[1].recorded={id:1042,name:'Studio headphones',price:149,currency:'EUR'};items[2].recorded={cart_id:'cart_8f2',items:2,total:298};items[3].recorded={authenticated:true,locale:'en-DE'};
+function snapshot(r){r.original={url:r.url,method:r.method,params:clone(r.params),headers:clone(r.headers),body:r.body}}
+items.forEach(snapshot);
+const current=()=>items.find(r=>r.id===selected);
+function notice(text){$('#pd-message').textContent=text;$('#pd-feedback').hidden=false;clearTimeout(timer);timer=setTimeout(()=>{$('#pd-feedback').hidden=true},2500)}
+function closeMenus(){for(const [button,panel] of [['pd-more','pd-actions'],['pd-filter-menu','pd-options']]){$('#'+panel).hidden=true;$('#'+button).setAttribute('aria-expanded','false')}}
+function view(v){$('main').dataset.view=v;$$('.switcher [data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v))}
+function list(){const saved=$('#pd-collection').value==='saved',filter=$('#pd-filter').value.toLowerCase();$('#pd-collection option[value=captured]').textContent='Captured · '+items.length;$('#pd-collection option[value=saved]').textContent='Saved · '+items.filter(r=>r.saved).length;$('#pd-total').textContent=items.length;$('#pd-list').innerHTML=items.filter(r=>(!saved||r.saved)&&(r.url+' '+r.method).toLowerCase().includes(filter)).map(r=>{let path='Untitled request';try{path=new URL(r.url).pathname}catch{}return `<button class="row" data-id="${r.id}" aria-pressed="${r.id===selected}" aria-label="${esc(r.method+' '+path)}"><span class="method ${r.method==='GET'?'':'write'}">${r.method}</span><span class="path">${esc(path)}${r.edited?' ·':''}</span><span class="row-status">${r.recorded||r.sent?'200':'—'}</span></button>`}).join('')||'<div class="empty"><strong>No matching requests</strong><span>Try another filter or collection.</span></div>'}
+function meta(){const r=current();$$('[data-save]').forEach(b=>{b.classList.toggle('saved',r.saved);b.setAttribute('aria-label',r.saved?'Request saved':'Save request');b.dataset.tooltip=r.saved?'Request saved':'Save request'});$('#pd-edited').hidden=!r.edited;$('#pd-param-count').textContent=r.params.filter(p=>p.key&&p.enabled).length||'';try{$('#pd-name').textContent=new URL(r.url).pathname}catch{$('#pd-name').textContent='Untitled request'}}
+function editor(){const r=current();$$('#pd-tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tab===tab));if(tab==='body'){$('#pd-editor').innerHTML=['GET','HEAD'].includes(r.method)?'<p class="note">This method sends no body.</p>':`<textarea aria-label="Request body" spellcheck="false" placeholder="JSON request body">${esc(r.body)}</textarea>`;return}const rows=r[tab];$('#pd-editor').innerHTML=`<table><thead><tr><th class="enabled"><span class="sr">Enabled</span></th><th>Key</th><th>Value</th></tr></thead><tbody>${rows.map((row,i)=>`<tr data-row="${i}"><td><input type="checkbox" data-field="enabled" aria-label="Enable ${esc(row.key||'row')}" ${row.enabled?'checked':''}></td><td><input type="text" data-field="key" aria-label="Key ${i+1}" value="${esc(row.key)}" placeholder="Key"></td><td><input type="text" data-field="value" aria-label="Value ${i+1}" value="${esc(row.value)}" placeholder="Value"></td></tr>`).join('')}</tbody></table><button class="add" id="pd-add"><i data-lucide="plus" aria-hidden="true"></i>Add ${tab==='params'?'parameter':'header'}</button>`;icons()}
+function response(){const r=current(),data=r[r.source];$('#pd-source').value=r.source;$('#pd-source option[value=sent]').disabled=!r.sent;$('#pd-source option[value=recorded]').disabled=!r.recorded;$('#pd-source').hidden=!r.recorded;$('#pd-status').hidden=!data;$('#pd-time').hidden=!data;$('#pd-switch-status').textContent=data?'200':'';$('#pd-time').textContent=r.source==='sent'?'98 ms':'124 ms';$$('[data-response]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.response===(mode==='headers'?'headers':'body')));$('#pd-response').setAttribute('aria-labelledby',mode==='headers'?'pd-response-headers-tab':'pd-response-body-tab');if(!data){$('#pd-response').innerHTML='<div class="empty"><strong>No response yet</strong><span>Send this request to see its response.</span></div>';return}let text=mode==='headers'?'content-type: application/json\ncache-control: no-cache\nx-request-id: req_7e91':JSON.stringify(data,null,mode==='preview'?2:0);let html=esc(text);if(mode==='preview')html=html.replace(/(&quot;.*?&quot;)(:)?/g,(m,s,k)=>`<span class="${k?'key':'string'}">${s}</span>${k||''}`);$('#pd-response').innerHTML='<pre class="code">'+html+'</pre>'}
+function choose(id){selected=id;const r=current();$('.layout').dataset.screen='detail';$('#pd-url').value=r.url;$('#pd-method').value=r.method;$('#pd-url').removeAttribute('aria-invalid');$('#pd-feedback').hidden=true;closeMenus();meta();list();editor();response()}
+function newRequest(){const r=make('');snapshot(r);items.unshift(r);$('#pd-filter').value='';$('#pd-collection').value='captured';tab='params';choose(r.id);view('request');$('#pd-url').focus()}
+function changed(){current().edited=true;meta();list()}
+function send(){const r=current();try{const u=new URL(r.url);if(!['http:','https:'].includes(u.protocol))throw Error()}catch{$('#pd-url').setAttribute('aria-invalid','true');$('#pd-url').focus();notice('Enter a valid http or https URL.');return}r.sent=r.recorded?clone(r.recorded):{ok:true,path:new URL(r.url).pathname};if(r.sent.limit!==undefined)r.sent.limit=Number(new URL(r.url).searchParams.get('limit'))||20;r.source='sent';response();view('response');notice('Replay complete · sample response')}
+$('#pd-new').onclick=newRequest;$('#pd-narrow-new').onclick=newRequest;$('#pd-send').onclick=send;
+$('#pd-back').onclick=()=>{$('.layout').dataset.screen='list';closeMenus()};$('#pd-list').onclick=e=>{const b=e.target.closest('[data-id]');if(b)choose(Number(b.dataset.id))};$('#pd-filter').oninput=list;$('#pd-collection').onchange=list;
+$$('[data-save]').forEach(b=>b.onclick=()=>{current().saved=true;meta();list();notice('Saved to your collection')});
+$('#pd-tabs').onclick=e=>{const b=e.target.closest('[data-tab]');if(b){tab=b.dataset.tab;editor()}};$$('.switcher [data-view]').forEach(b=>b.onclick=()=>view(b.dataset.view));
+$('#pd-url').oninput=e=>{const r=current();r.url=e.target.value;try{r.params=Array.from(new URL(r.url).searchParams,([key,value])=>({key,value,enabled:true}))}catch{r.params=[]}$('#pd-url').removeAttribute('aria-invalid');changed();if(tab==='params')editor()};$('#pd-method').onchange=e=>{current().method=e.target.value;changed();if(tab==='body')editor()};
+$('#pd-editor').oninput=e=>{const r=current();if(e.target.tagName==='TEXTAREA'){r.body=e.target.value;changed();return}const row=e.target.closest('[data-row]');if(!row)return;const field=e.target.dataset.field;r[tab][Number(row.dataset.row)][field]=field==='enabled'?e.target.checked:e.target.value;if(tab==='params'){try{const u=new URL(r.url);u.search='';r.params.filter(p=>p.key&&p.enabled).forEach(p=>u.searchParams.append(p.key,p.value));r.url=u.href;$('#pd-url').value=r.url}catch{}}changed()};
+$('#pd-editor').onclick=e=>{if(e.target.closest('#pd-add')){current()[tab].push({key:'',value:'',enabled:true});editor();$$('#pd-editor [data-field=key]').at(-1).focus();changed()}};
+$('#pd-source').onchange=e=>{current().source=e.target.value;response()};
+for(const [button,panel] of [['pd-more','pd-actions'],['pd-filter-menu','pd-options']])$('#'+button).onclick=()=>{const open=$('#'+panel).hidden;closeMenus();$('#'+panel).hidden=!open;$('#'+button).setAttribute('aria-expanded',open)};
+$('#pd-api').onchange=e=>{$('#pd-filter-menu').setAttribute('aria-pressed',e.target.checked);$('#pd-filter-menu').dataset.tooltip=e.target.checked?'XHR / Fetch only':'All request types';closeMenus()};
+$('#pd-record').onclick=()=>{const on=$('#pd-record').getAttribute('aria-pressed')!=='true';$('#pd-record').setAttribute('aria-pressed',on);$('#pd-record').setAttribute('aria-label',on?'Pause recording':'Resume recording');$('#pd-record').dataset.tooltip=on?'Pause recording':'Resume recording'};
+$('#pd-reset').onclick=()=>{const r=current();Object.assign(r,clone(r.original));r.edited=false;choose(r.id);notice('Original request restored')};
+$('#pd-duplicate').onclick=()=>{const r=clone(current());r.id=seq++;r.saved=false;r.sent=null;r.edited=false;snapshot(r);items.unshift(r);$('#pd-collection').value='captured';$('#pd-filter').value='';choose(r.id);notice('Request duplicated')};
+$('#pd-response-mode').onclick=()=>{bodyMode=bodyMode==='raw'?'preview':'raw';mode=bodyMode;$('#pd-response-mode').innerHTML='<i data-lucide="code" aria-hidden="true"></i>'+(mode==='raw'?'Show formatted response':'Show raw response');icons();closeMenus();response();view('response')};
+$$('[data-response]').forEach(b=>b.onclick=()=>{mode=b.dataset.response==='headers'?'headers':bodyMode;response()});
+$('#pd-dismiss').onclick=()=>{$('#pd-feedback').hidden=true};root.addEventListener('click',e=>{if(!e.target.closest('.menu-anchor'))closeMenus()});root.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenus();$('#pd-feedback').hidden=true}if(e.key==='Enter'&&(e.target.id==='pd-url'||e.metaKey||e.ctrlKey)){e.preventDefault();send()}});
+const design={width:1024,height:320,appearance:'system'};
+function apply(){root.style.maxWidth=design.width+'px';root.style.height=design.height+'px';root.style.colorScheme=design.appearance==='system'?'inherit':design.appearance;$('#pd-theme').value=design.appearance}
+const saved=window.openai?.widgetState?.modelContent;if(['light','dark','system'].includes(saved?.appearance))design.appearance=saved.appearance;
+$('#pd-theme').onchange=e=>{design.appearance=e.target.value;apply();window.openai?.setWidgetState?.({modelContent:{appearance:design.appearance},privateContent:null})?.catch(()=>{})};
+window.addEventListener('openai:set_globals',e=>{const a=e.detail?.globals?.widgetState?.modelContent?.appearance;if(['system','light','dark'].includes(a)){design.appearance=a;apply()}});
+apply();choose(1);
+if(globalThis.Tweak){const t=new Tweak({container:root,onChange:apply});t.addSlider(design,'width',{label:'Panel width',min:320,max:1024,step:1,unit:'px'});t.addSlider(design,'height',{label:'Panel height',min:240,max:640,step:1,unit:'px'});t.addSelect(design,'appearance',{label:'Appearance',options:['system','light','dark']})}
+})();
+</script>
