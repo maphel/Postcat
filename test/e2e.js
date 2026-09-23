@@ -578,6 +578,13 @@ function ok(name, condition, detail) {
     menu: pairs.map(([, b]) => b).filter((id) => !document.getElementById(id).hidden),
     menuBtn: document.getElementById('resMenuBtn').checkVisibility(),
   }), PAIRS);
+  // Collapse order (Copy/Save, Preview/Raw, size, time): whatever is collapsed, everything before it is
+  // collapsed too. Width-tolerant, so the checks hold with wider system fonts (CI on Linux) as well.
+  const collapseOrdered = () => page.evaluate(() => {
+    const shown = ['resCopy', 'resSave', 'resMode', 'resSize', 'resTime'].map((id) => document.getElementById(id)).filter((el) => !el.hidden).map((el) => el.checkVisibility());
+    return shown.every((v, i) => i === 0 || !shown[i - 1] || v);
+  });
+  const pillShown = () => page.evaluate(() => document.getElementById('resStatus').checkVisibility());
   // Each action is offered exactly once and the header fits; the fit follows the pane's ResizeObserver
   // (next frame), so wait for it rather than reading the state left by the previous size.
   const settleActions = () => settle((pairs) => {
@@ -628,8 +635,13 @@ function ok(name, condition, detail) {
     await settleActions();
     const a = await bodyActions();
     check(`${w}×${h}: each body action offered once, ⋯ only when something is collapsed`, [a.inline.length + a.menu.length, a.menuBtn], [3, a.menu.length > 0]);
-    // Time stays at every reference size; size down to 380 px (at 320 px it goes when the text is wide).
-    check(`${w}×${h}: time${w > 320 ? ' and size' : ''} shown`, await page.evaluate(() => [document.getElementById('resTime').checkVisibility(), document.getElementById('resSize').checkVisibility()]), [true, w > 320 ? true : await page.isVisible('#resSize')]);
+    // Time and size stay wherever the pane leaves room beyond doubt (≥ 375 px: 68 px+ to spare with
+    // macOS fonts); at the narrower panes only the order and the status are pinned, since wider
+    // system fonts legitimately collapse more there.
+    check(`${w}×${h}: collapse order respected`, await collapseOrdered(), true);
+    const paneW = await page.evaluate(() => document.getElementById('resPane').clientWidth);
+    if (paneW >= 375) check(`${w}×${h}: time and size shown`, await page.evaluate(() => [document.getElementById('resTime').checkVisibility(), document.getElementById('resSize').checkVisibility()]), [true, true]);
+    else check(`${w}×${h}: status shown`, await pillShown(), true);
     check(`${w}×${h}: nothing clipped in the response header`, await clipped('resPane', 'resTabs'), []);
     if (mode !== 'wide') await page.click('#viewTabs button[data-view=request]');
     check(`${w}×${h}: nothing clipped in the request header`, await clipped('reqPane', 'reqTabs'), []);
@@ -647,12 +659,14 @@ function ok(name, condition, detail) {
   await page.click('#viewTabs button[data-view=request]');
   await resize(1024, 320);
   await settleActions();
-  check('1024×320: Copy/Save collapse before Preview/Raw', await bodyActions(), { inline: ['resMode'], menu: ['copyResBtn', 'saveResBtn'], menuBtn: true });
+  // At the boundary here (the pill is at its minimum with macOS fonts): only the order is pinned.
+  const at1024 = await bodyActions();
+  check('1024×320: Copy/Save are the first to collapse', [await collapseOrdered(), at1024.menu.length === 0 || (at1024.menu.includes('copyResBtn') && at1024.menu.includes('saveResBtn'))], [true, true]);
   await resize(320, 260);
   await page.click('#viewTabs button[data-view=response]');
   await settleActions();
   check('320×260: all body actions in the ⋯ menu, none inline', await bodyActions(), { inline: [], menu: ['resModeItem', 'copyResBtn', 'saveResBtn'], menuBtn: true });
-  check('320×260: time still shown', await page.evaluate(() => document.getElementById('resTime').checkVisibility()), true);
+  check('320×260: collapse order respected, status shown', [await collapseOrdered(), await pillShown()], [true, true]);
   await page.click('#resMenuBtn');
   check('320×260: the open ⋯ menu shows exactly the collapsed actions', await page.evaluate(() => [...document.querySelectorAll('#resMenu [role=menuitem]')].filter((b) => b.checkVisibility()).map((b) => b.textContent)), ['Show preview', 'Copy body', 'Save body as file…']);
   await page.keyboard.press('Escape');
@@ -742,9 +756,10 @@ function ok(name, condition, detail) {
   check('Sent selected after the send', await page.inputValue('#resSource'), 'sent');
   // Recorded and sent both exist now: the selector replaces the label and offers both sources.
   check('source selector with both options once both exist', await page.evaluate(() => [document.getElementById('resSource').checkVisibility(), document.getElementById('resSourceLabel').checkVisibility(), [...document.getElementById('resSource').options].map((o) => [o.value, o.disabled])]), [true, false, [['recorded', false], ['sent', false]]]);
-  // The widest combination at the narrowest size: select, status and time fit next to the ⋯ (size goes).
+  // The widest combination at the narrowest size: nothing clipped, the collapse order kept and the
+  // status still there (time fits with macOS fonts, not necessarily with wider ones).
   await settleActions();
-  check('320×260 with the selector: time shown, nothing clipped', [await page.evaluate(() => document.getElementById('resTime').checkVisibility()), await clipped('resPane', 'resTabs')], [true, []]);
+  check('320×260 with the selector: nothing clipped, order respected, status shown', [await clipped('resPane', 'resTabs'), await collapseOrdered(), await pillShown()], [[], true, true]);
   includes('sent body', await page.textContent('#resBody'), '"url": "/layout?x=1&keep=kept"');
   await page.click('#resTabs button[data-tab=resHeaders]');
   const sentHeaders = await page.textContent('#resHeaders');
