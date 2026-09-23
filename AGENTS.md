@@ -23,8 +23,9 @@ dependencies. `README.md` describes the behaviour; this file describes the code.
 | `test/e2e.js`, `test/real-devtools.js` | Playwright e2e against the stubbed `chrome.devtools`; real Chrome + DevTools over CDP |
 | `test/harness.js`, `test/devtools-stub.js` | Builds and launches the extension for e2e and the screenshot script, with shared waits (`waitForRows`, `waitForSendDone`); the fake `chrome.devtools` the harness page loads before the panel |
 | `scripts/pack.js`, `scripts/screenshot.js` | Zip for distribution; renders `docs/screenshot.png` (the README image) through the harness |
-| `.github/workflows/` | `check.yml` runs lint, unit, e2e and real-DevTools tests, then pack (the zip is uploaded as a workflow artifact) on push/PR; `release.yml` attaches the zip to a `v*` tag release |
-| `.github/ISSUE_TEMPLATE/`, `.github/dependabot.yml` | Bug report template and contact link for security reports; monthly grouped dependency updates (npm, actions) |
+| `scripts/release.js`, `scripts/changelog-section.js` | `npm run release <version>` prepares the release branch (version bump, changelog), `npm run release tag` tags the merged `main`; prints one `CHANGELOG.md` section (release notes) |
+| `.github/workflows/` | `check.yml` runs lint, unit, e2e and real-DevTools tests, then pack (the zip is uploaded as a workflow artifact) on push/PR; `release.yml` checks the `v*` tag against the version, runs lint/unit/e2e, packs and publishes the release with the changelog section as notes |
+| `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md`, `.github/dependabot.yml` | Bug report template and contact link for security reports; PR template with the definition-of-done checklist; monthly grouped dependency updates (npm, actions) |
 | `package.json`, `eslint.config.js`, `.editorconfig`, `.gitignore` | Scripts and dev dependencies (`package-lock.json` pinned); lint rules; editor and ignore settings |
 | `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE` | User docs, release notes, contributor guide, security policy, MIT licence |
 | `AGENTS.md`, `CLAUDE.md`, `LESSONS_LEARNED.md` | This file (`CLAUDE.md` is a symlink to it); append-only incident log |
@@ -54,6 +55,22 @@ Module graph (top to bottom, acyclic): `main` → `actions` → `editor` / `send
 10. Tests reach panel internals only through the DOM, and the worker only through `self.postcatSend`.
     Read-only inspection of the worker's DNR rules (`chrome.declarativeNetRequest.getSessionRules`)
     is allowed; tests never add or remove rules themselves.
+
+## Workflow
+
+`CONTRIBUTING.md` is the source of truth for branching, commits, the definition of done and
+releases. For agents, in addition:
+
+- Issue first: any behaviour change needs an issue, bug fixes included (open one if none
+  exists, then branch as `<type>/<topic>` from `main`); typos and docs-only fixes need none.
+  This is stricter than `CONTRIBUTING.md` on purpose: agents work unattended, and the issue is
+  the human-readable trail of what was changed and why.
+- Follow the definition of done, open a PR and request an independent review (a second agent
+  or a human) before merge. Never merge your own PR unreviewed.
+- Ask a human before: adding manifest `permissions` or `host_permissions`; changing the
+  saved-collection storage format (`src/panel/storage.js`); cutting a release; force-pushes or
+  history rewrites; dependency upgrades other than merging Dependabot PRs; changing CI
+  `permissions` in `.github/workflows/`.
 
 ## Verification
 

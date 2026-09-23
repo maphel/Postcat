@@ -25,7 +25,9 @@ jobs:
       - run: npm test
       - run: npm run test:e2e
       - run: npm run pack
+      # Release notes are the CHANGELOG.md section for this version; fails if it is missing.
+      - run: node scripts/changelog-section.js "${GITHUB_REF_NAME#v}" > "${RUNNER_TEMP}/release-notes.md"
       - uses: softprops/action-gh-release@v3
         with:
           files: dist/*.zip
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/release-notes.md

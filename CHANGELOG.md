@@ -1,9 +1,17 @@
 # Changelog
 
+All notable changes to Postcat are listed here. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
+
+## Unreleased
+
+<!-- Entries go under ### Added / ### Changed / ### Fixed / ### Removed; add only the subsections you need. -->
+
 ## 0.1.0 — 2026-09-23
 
 First public release.
 
+### Added
 - Capture requests of the inspected tab, including response bodies; import DevTools' existing log.
 - Edit method, URL, params, headers and body; cURL import and export.
 - Replay from the extension: no CORS, forbidden headers via declarativeNetRequest, cancel,
