@@ -6,6 +6,7 @@ import { refreshSearch } from './search.js';
 
 const HIGHLIGHT_LIMIT = 300_000; // chars; larger bodies render as plain text
 const PRETTY_LIMIT = 2_000_000;  // chars; larger JSON isn't re-indented (parse + reindent would stall the panel)
+const HEX_DUMP_BYTES = 4096;     // bytes shown in the hex view of a binary body
 const PREVIEWABLE = new Set(['image', 'svg', 'video', 'audio', 'pdf', 'font', 'html']);
 
 // What's on screen, for Copy / Save / the Preview-Raw toggle.
@@ -220,7 +221,7 @@ function renderRaw(model) {
     renderBody(model.text);
   } else {
     const label = `${model.mime || 'binary data'} · ${formatBytes(model.size)}\n\n`;
-    setBodyText(label + hexDump(model.bytes, 4096), 'hex');
+    setBodyText(label + hexDump(model.bytes, HEX_DUMP_BYTES), 'hex');
     shownText = null;
     updateBodyActions();
   }

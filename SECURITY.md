@@ -13,6 +13,9 @@
 - Response previews render remote content: HTML in a fully sandboxed `srcdoc` iframe (no scripts,
   opaque origin), media through `<img>`, `<video>`, `<audio>` and Chrome's PDF viewer, everything
   else as text or hex. The panel never uses `innerHTML`.
+- One exception to "no network requests of its own": when you switch an HTML response to
+  Preview, the sandboxed frame gets a `<base href>` pointing at the response URL, so the page's
+  images and stylesheets are loaded from the original server (scripts stay blocked).
 
 ## Reporting a vulnerability
 

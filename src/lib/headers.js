@@ -1,4 +1,3 @@
-
 export function headersToText(headers) {
   return headers.map((h) => `${h.name}: ${h.value}`).join('\n');
 }

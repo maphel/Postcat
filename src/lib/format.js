@@ -1,4 +1,3 @@
-
 export function formatBytes(n) {
   if (!Number.isFinite(n) || n < 0) return '';
   if (Math.round(n) < 1024) return `${Math.round(n)} B`;

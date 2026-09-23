@@ -10,7 +10,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,10 +18,13 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run lint && npm test
-      - run: npm run pack
       # Tag must match the version in manifest.json / package.json.
       - run: test "v$(node -p "require('./package.json').version")" = "${GITHUB_REF_NAME}"
+      - run: npx playwright install --with-deps chromium
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:e2e
+      - run: npm run pack
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*.zip

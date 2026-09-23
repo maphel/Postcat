@@ -1,4 +1,3 @@
-
 // ---------- query params ----------
 
 function splitUrl(url) {

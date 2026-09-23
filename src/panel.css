@@ -18,6 +18,11 @@
   --j-num: #1c00cf;
   --j-bool: #0d22aa;
   --j-null: #80868b;
+  --search-match: #fbbc04;
+  --search-current: #f29900;
+  --search-current-text: #000000;
+  --page-bg: #ffffff;
+  --toast-link: #8ab4f8; /* the toast is inverted, so it uses the other theme's accent */
   --shadow: 0 4px 16px rgba(0, 0, 0, .14);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --sidebar-w: 320px;
@@ -44,6 +49,11 @@
   --j-num: #9980ff;
   --j-bool: #9980ff;
   --j-null: #8b8b8b;
+  --search-match: #fbbc04;
+  --search-current: #f29900;
+  --search-current-text: #000000;
+  --page-bg: #ffffff;
+  --toast-link: #1a73e8;
   --shadow: 0 4px 16px rgba(0, 0, 0, .5);
 }
 
@@ -433,8 +443,8 @@ button.primary.cancel {
   color: var(--text);
 }
 
-::highlight(postcat-match) { background-color: color-mix(in srgb, #fbbc04 45%, transparent); }
-::highlight(postcat-current) { background-color: #f29900; color: #000; }
+::highlight(postcat-match) { background-color: color-mix(in srgb, var(--search-match) 45%, transparent); }
+::highlight(postcat-current) { background-color: var(--search-current); color: var(--search-current-text); }
 
 /* ---------- media preview ---------- */
 
@@ -475,7 +485,7 @@ button.primary.cancel {
 .preview .caption.notice { margin: auto 0 0; max-width: 420px; font-size: 12px; line-height: 1.5; }
 .preview .caption.notice + button { margin: 0 0 auto; }
 .preview iframe { flex: 1; width: 100%; border: none; min-height: 0; }
-.preview iframe.page { background: #fff; }
+.preview iframe.page { background: var(--page-bg); }
 
 .font-preview { align-self: stretch; margin: auto 0; padding: 0 8px; overflow-wrap: anywhere; }
 .font-preview div { margin: 0 0 10px; }
@@ -504,9 +514,7 @@ button.primary.cancel {
   z-index: 10;
 }
 .toast.show { opacity: 1; transform: none; pointer-events: auto; }
-.toast button.link { color: var(--accent); font-weight: 600; padding: 0; }
-:root:not(.dark) .toast button.link { color: #8ab4f8; }
-:root.dark .toast button.link { color: #1a73e8; }
+.toast button.link { color: var(--toast-link); font-weight: 600; padding: 0; }
 
 /* ---------- narrow DevTools ---------- */
 

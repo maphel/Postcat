@@ -5,7 +5,7 @@ const extensionGlobals = { ...globals.browser, ...globals.webextensions, Highlig
 
 export default [
   js.configs.recommended,
-  { ignores: ['node_modules/'] },
+  { ignores: ['node_modules/', 'dist/', '.claude/'] },
   {
     files: ['src/**/*.js'],
     languageOptions: { ecmaVersion: 2024, sourceType: 'module', globals: extensionGlobals },

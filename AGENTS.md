@@ -40,10 +40,13 @@ Module graph (top to bottom, acyclic): `main` → `actions` → `editor` / `send
 6. `src/lib` stays pure. Behaviour of `chrome.devtools.*` is verified in `test/real-devtools.js`
    before the stub in `test/devtools-stub.js` is taught it.
 7. The list renders on the next animation frame: read list state from `visibleItems()`, not the
-   DOM; tests poll for the expected state instead of sleeping.
+   DOM. E2E tests poll for the expected state instead of sleeping; the real-DevTools suite is
+   exempt because it drives Chrome over raw CDP without a DOM handle to poll.
 8. Every path that removes an item (delete, reset, clear, cap) ends its in-flight send (`abandonSend`).
 9. Everything read from `chrome.storage` is validated; one corrupt record must not break the panel.
 10. Tests reach panel internals only through the DOM, and the worker only through `self.postcatSend`.
+    Read-only inspection of the worker's DNR rules (`chrome.declarativeNetRequest.getSessionRules`)
+    is allowed; tests never add or remove rules themselves.
 
 ## Verification
 

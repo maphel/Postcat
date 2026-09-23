@@ -1,5 +1,6 @@
 // chrome.storage.local: the saved collection and the panel settings.
 import { state, nextId, DEFAULT_LAYOUT } from './state.js';
+import { toast } from './dom.js';
 
 const SAVED_KEY = 'postcat.saved';
 const SETTINGS_KEY = 'postcat.settings';
@@ -42,7 +43,12 @@ export function persistSaved() {
   clearTimeout(savedTimer);
   savedTimer = 0;
   const plain = state.saved.map(({ name, method, url, headersText, body }) => ({ name, method, url, headersText, body }));
-  return chrome.storage.local.set({ [SAVED_KEY]: plain });
+  return write({ [SAVED_KEY]: plain });
+}
+
+// A rejected write (quota exhausted, storage unavailable) would otherwise stop autosave silently.
+function write(items) {
+  return chrome.storage.local.set(items).catch((err) => toast(`Couldn’t save: ${err?.message || err}`));
 }
 
 let settingsTimer = 0;
@@ -54,7 +60,7 @@ export function persistSettings() {
 function writeSettings() {
   settingsTimer = 0;
   const { xhrOnly, bulkHeaders, tab, reqTab, filterText, layout } = state;
-  return chrome.storage.local.set({ [SETTINGS_KEY]: { xhrOnly, bulkHeaders, tab, reqTab, filterText, layout } });
+  return write({ [SETTINGS_KEY]: { xhrOnly, bulkHeaders, tab, reqTab, filterText, layout } });
 }
 
 // Debounced writes still pending when DevTools closes.

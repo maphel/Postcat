@@ -166,9 +166,11 @@ test('previewKind maps content types', () => {
 test('looksLikeText: utf-8 yes, binary no, cut multibyte sequence ok', () => {
   assert.ok(lib.looksLikeText(new TextEncoder().encode('hällo {"a":1}')));
   assert.ok(!lib.looksLikeText(lib.base64ToBytes(PNG_1x1)));
-  const long = new TextEncoder().encode('ä'.repeat(40000)); // 80000 bytes, sample cuts inside "ä"? 65536 is even -> not cut
+  // 80000 bytes of two-byte characters: the 65536-byte sample boundary is even, so it falls between characters.
+  const long = new TextEncoder().encode('ä'.repeat(40000));
   assert.ok(lib.looksLikeText(long));
-  const odd = new TextEncoder().encode('x' + 'ä'.repeat(40000)); // sample boundary lands mid-character
+  // Shifted by one byte, the sample boundary now cuts through a character; that must still count as text.
+  const odd = new TextEncoder().encode('x' + 'ä'.repeat(40000));
   assert.ok(lib.looksLikeText(odd));
 });
 

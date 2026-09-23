@@ -53,7 +53,7 @@ bytes when the header is missing or generic.
 | `⌘/Ctrl + F` | Search the response (DevTools' search bar) |
 | `↑` `↓` | Move through the list |
 | `/` | Focus the filter |
-| `Del` | Delete (undo from the toast) |
+| `Del` / `Backspace` | Delete (undo from the toast) |
 
 ## How replay works
 

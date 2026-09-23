@@ -130,7 +130,7 @@ async function send({ method, url, headers, body }, controller = new AbortContro
     if (body && method !== 'GET' && method !== 'HEAD') init.body = body;
 
     const res = await fetch(target.href, init);
-    const { bytes, truncated } = await readBody(res, MAX_BODY_BYTES);
+    const { bytes, truncated, total } = await readBody(res, MAX_BODY_BYTES);
     const contentType = res.headers.get('content-type') || '';
     // Text goes over as a string; everything else (images, video, …) as base64.
     const info = truncated ? { text: null } : describeBody({ bytes, mime: contentType });
@@ -147,7 +147,8 @@ async function send({ method, url, headers, body }, controller = new AbortContro
       bodyBase64: isText || tooLarge ? null : bytesToBase64(bytes),
       tooLarge,
       mimeType: contentType,
-      size: truncated ? Number(res.headers.get('content-length')) || bytes.length : bytes.length,
+      // Truncated: Content-Length if the server sent one, else at least what was read before the cap.
+      size: truncated ? Number(res.headers.get('content-length')) || total : bytes.length,
       time: performance.now() - started,
     };
   } finally {
@@ -157,6 +158,7 @@ async function send({ method, url, headers, body }, controller = new AbortContro
 }
 
 // Reads at most `limit` bytes; anything beyond is dropped and the connection cancelled.
+// On truncation `total` is the byte count read before the cap tripped.
 async function readBody(res, limit) {
   const chunks = [];
   let total = 0;
@@ -168,7 +170,7 @@ async function readBody(res, limit) {
     total += value.length;
     if (total > limit) {
       await reader.cancel();
-      return { bytes: new Uint8Array(0), truncated: true };
+      return { bytes: new Uint8Array(0), truncated: true, total };
     }
     chunks.push(value);
   }
