@@ -329,11 +329,14 @@ body.resizing { cursor: col-resize; user-select: none; }
 .app[data-layout=narrow] .urlbar { padding: 5px 6px; gap: 4px; }
 .address { flex: 1; min-width: 0; display: flex; align-items: center; height: 28px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg-field); }
 .address:focus-within { border-color: var(--accent); }
+/* Sized to its content and never shrunk: the method stays readable, the URL field gives way. The cap
+   only bites for absurdly long custom methods. */
 .address select {
   height: 26px;
   min-height: 26px;
-  min-width: 64px;
-  max-width: 84px;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 45%;
   border: 0;
   border-right: 1px solid var(--border);
   border-radius: 4px 0 0 4px;

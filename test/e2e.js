@@ -671,6 +671,24 @@ function ok(name, condition, detail) {
     check(`${w}×${h}: app root does not overflow`, s.overflow, [false, false]);
     check(`${w}×${h}: Send on screen`, s.send, true);
     check(`${w}×${h}: context row ${mode === 'narrow' ? 'is the navigation row' : 'absent'}`, await page.evaluate(() => document.getElementById('context').checkVisibility()), mode === 'narrow');
+    // The method select keeps its content width (compared with an unconstrained clone); the URL
+    // field shrinks instead, and Send stays inside the viewport.
+    if (mode === 'narrow') {
+      for (const method of ['OPTIONS', 'DELETE']) {
+        await page.selectOption('#method', method);
+        check(`${w}×${h}: ${method} fully readable, Send on screen`, await page.evaluate(() => {
+          const sel = document.getElementById('method');
+          const clone = sel.cloneNode(true);
+          Object.assign(clone.style, { position: 'absolute', left: '-9999px', width: 'auto', flex: 'none', minWidth: '0', maxWidth: 'none' });
+          sel.parentElement.append(clone);
+          const intrinsic = clone.getBoundingClientRect().width;
+          clone.remove();
+          const send = document.getElementById('sendBtn').getBoundingClientRect();
+          return [sel.scrollWidth <= sel.clientWidth, sel.getBoundingClientRect().width >= intrinsic - .5, send.left >= 0 && send.right <= innerWidth + .5];
+        }), [true, true, true]);
+      }
+      await page.selectOption('#method', 'GET'); // back to the recorded method, so the draft stays unedited
+    }
     if (mode === 'wide') check(`${w}×${h}: list, request and response side by side`, [s.list, s.req, s.res, s.switcher], [true, true, true, false]);
     else if (mode === 'medium') check(`${w}×${h}: list plus one switched pane`, [s.list, s.switcher, s.req, s.res], [true, true, s.view === 'request', s.view === 'response']);
     else check(`${w}×${h}: details fill the width`, [s.screen, s.list, s.switcher, s.req || s.res], ['detail', false, true, true]);
