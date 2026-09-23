@@ -7,8 +7,10 @@ Append-only incident log, newest first. Each entry: symptom, root cause, fix, pr
 **Symptom:** The e2e suite passed locally but timed out in CI waiting for the service worker.
 **Root cause:** Without `CHROME` set, Playwright 1.49+ launches its "headless shell", which
 cannot load extensions. Locally the environment variable hid this.
-**Fix:** `channel: 'chromium'` / `executablePath('chromium')` in both browser suites.
-**Prevention:** Run the suites once without `CHROME` before relying on CI.
+**Fix:** `channel: 'chromium'` / `executablePath('chromium')` in both browser suites; the
+real-DevTools suite additionally needs `--no-sandbox --disable-gpu` on Linux runners.
+**Prevention:** Run the suites once without `CHROME` before relying on CI; when a browser
+target never appears, print Chrome's own output instead of guessing.
 
 ## 2026-09-23 — Security review after the restructure
 
