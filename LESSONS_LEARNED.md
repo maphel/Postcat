@@ -2,6 +2,17 @@
 
 Append-only incident log, newest first. Each entry: symptom, root cause, fix, prevention.
 
+## 2026-09-23 — Keys inside a popover menu reached the global shortcuts
+
+**Symptom:** ArrowDown in an open ⋯ menu moved the list selection underneath the menu; Backspace
+on a focused menu item would have deleted the request.
+**Root cause:** The menu's keydown handler moved focus but let the event bubble, and the
+document-level shortcut handler only exempted inputs, not popover content.
+**Fix:** The menu handler stops propagation for the keys it handles; the global handler ignores
+targets inside `[popover]` for arrows, `/` and Delete/Backspace. E2E covers both.
+**Prevention:** Every overlay with its own keyboard handling stops propagation for its keys, and
+document-level shortcuts exempt `[popover]` targets like they exempt inputs.
+
 ## 2026-09-23 — CI ran the browser suites in a browser without extension support
 
 **Symptom:** The e2e suite passed locally but timed out in CI waiting for the service worker.

@@ -5,4 +5,4 @@ export { paramsToUrl, urlToParams } from './url.js';
 export { parseCurl, shellSplit, toCurl } from './curl.js';
 export { expectsJson, formatBody, jsonError, prettyBody, tokenizeJson } from './json.js';
 export { base64ToBytes, bytesToBase64, cleanMime, describeBody, fileNameFor, hexDump, looksLikeText, previewKind, sniffMime } from './body.js';
-export { fetchErrorMessage, formatBytes, formatTime } from './format.js';
+export { captureInfo, fetchErrorMessage, formatBytes, formatTime } from './format.js';

@@ -2,7 +2,8 @@
 
 export const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 export const MAX_CAPTURED = 1000;
-export const DEFAULT_LAYOUT = { sidebarW: 320, reqW: 50 };
+export const DEFAULT_LAYOUT = { sidebarW: 214, reqW: 45 };
+export const APPEARANCES = ['system', 'light', 'dark'];
 
 export const state = {
   recording: true,
@@ -11,8 +12,13 @@ export const state = {
   reqTab: 'params',
   resTab: 'resBody',
   bulkHeaders: false,
+  appearance: 'system',   // 'system' follows DevTools' theme
   layout: { ...DEFAULT_LAYOUT },
+  layoutMode: 'wide',     // wide | medium | narrow, from the panel width (layout.js)
+  screen: 'detail',       // narrow layout: list | detail
+  detailView: 'request',  // medium/narrow layouts: request | response
   filterText: '',
+  renaming: null,       // id of the saved request whose name is being edited in its list row
   filter: null,
   captured: [],
   saved: [],

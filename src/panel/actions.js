@@ -3,16 +3,21 @@ import { headersToText, toCurl, parseCurl, compileFilter } from '../lib/index.js
 import { state, lists, current, visibleItems, copyOf, defaultName, nextId } from './state.js';
 import { persistSaved, persistSettings } from './storage.js';
 import { $, toast, copyText } from './dom.js';
-import { renderList } from './list.js';
+import { renderList, endRename } from './list.js';
 import { renderEditor } from './editor.js';
-import { clamp } from './layout.js';
+import { clamp, layoutMode, showScreen } from './layout.js';
 import { requestOf, abandonSend } from './sending.js';
 
-export function select(id) {
+// `reveal` opens the detail screen in the narrow layout (a click on a row, a new request);
+// keyboard movement through the list keeps the current screen.
+export function select(id, { reveal = false } = {}) {
+  endRename(true);
   state.selectedId = id;
+  if (reveal) state.screen = 'detail';
   renderEditor();
   renderList({ scroll: true });
 }
+
 
 export async function save() {
   const item = current();
@@ -27,8 +32,19 @@ export async function save() {
   await persistSaved();
   switchTab('saved');
   select(copy.id);
-  toast('Saved to collection');
-  $('name').select();
+  toast('Saved', { label: 'Rename', run: rename }); // the one place that teaches the rename gesture
+}
+
+// Inline rename of the selected saved request: its list row shows an input (list.js). The narrow
+// layout opens the list screen for it.
+export function rename() {
+  const item = current();
+  if (!item || item.kind !== 'saved') return;
+  if (state.tab !== 'saved') switchTab('saved');
+  if (state.filter && !visibleItems().includes(item)) setFilter(''); // hidden by the filter: show the row to rename
+  state.renaming = item.id;
+  if (layoutMode() === 'narrow') showScreen('list');
+  renderList({ scroll: true });
 }
 
 export async function duplicate() {
@@ -138,7 +154,7 @@ export function newRequest(from) {
   persistSaved();
   setFilter('');
   switchTab('saved');
-  select(item.id);
+  select(item.id, { reveal: true });
   if (!from) $('url').focus();
   return item;
 }
@@ -156,7 +172,7 @@ export function tryParseCurl(text) {
 
 export function switchTab(tab) {
   state.tab = tab;
-  for (const b of $('listTabs').querySelectorAll('button')) b.classList.toggle('active', b.dataset.tab === tab);
+  for (const b of $('collection').querySelectorAll('[role=tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   renderList();
   persistSettings();
 }
@@ -171,7 +187,9 @@ export function setFilter(text) {
 
 export function setRecording(on) {
   state.recording = on;
-  $('recordBtn').classList.toggle('on', on);
-  $('recordLabel').textContent = on ? 'Recording' : 'Paused';
+  const btn = $('recordBtn');
+  btn.setAttribute('aria-pressed', String(on));
+  btn.setAttribute('aria-label', on ? 'Pause recording' : 'Resume recording');
+  btn.title = on ? 'Recording · click to pause' : 'Paused · click to resume recording';
   renderList();
 }

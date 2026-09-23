@@ -241,3 +241,9 @@ test('jsonError locates common mistakes', () => {
   assert.strictEqual(at('{"a": "x\ny"}'), '1:9 Line break or control character in string');
   assert.strictEqual(at('{} x'), '1:4 Unexpected content after the JSON value');
 });
+
+test('captureInfo: time, resource type and duration, without a valid date just "Captured"', () => {
+  assert.strictEqual(lib.captureInfo({ startedDateTime: 'nope', resourceType: 'fetch', recorded: { time: 5 } }), 'Captured · fetch · 5 ms');
+  assert.match(lib.captureInfo({ startedDateTime: '2026-09-23T10:00:00Z', resourceType: 'xhr' }), /^Captured \S+.* · xhr$/);
+  assert.strictEqual(lib.captureInfo({}), 'Captured');
+});

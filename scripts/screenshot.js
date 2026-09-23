@@ -1,5 +1,6 @@
-// Renders docs/screenshot.png: the panel with a few captured requests and one replayed response.
-// Uses the same harness as test/e2e.js (stubbed chrome.devtools) in Playwright's Chromium.
+// Renders docs/screenshot.png: the compact panel at a bottom-docked size (1024 × 320) with a few
+// captured requests and one replayed response. Uses the same harness as test/e2e.js (stubbed
+// chrome.devtools) in Playwright's Chromium.
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -17,7 +18,7 @@ await new Promise((r) => server.listen(8766, r));
 const { dir, cleanup } = buildExtension();
 const { ctx, id } = await launch(dir);
 try {
-  const { page } = await openPanel(ctx, id, { width: 1280, height: 560 });
+  const { page } = await openPanel(ctx, id, { width: 1024, height: 320 });
   await page.evaluate(() => {
     const call = (method, url, status, time, body) => harEntry({
       method, url, status, time, body,
@@ -26,16 +27,21 @@ try {
       resHeaders: [{ name: 'content-type', value: 'application/json' }],
       content: '{"id":42,"name":"Mittens"}',
     });
+    __emit(call('GET', 'http://localhost:8766/api/cats/42/photos', 200, 61));
     __emit(call('DELETE', 'http://localhost:8766/api/cats/7', 404, 51));
     __emit(call('PATCH', 'http://localhost:8766/api/cats/42', 200, 96, '{"name":"Mittens"}'));
     __emit(call('POST', 'http://localhost:8766/api/cats', 201, 142, '{"name":"Mittens","tags":["cat","indoor"]}'));
     __emit(call('GET', 'http://localhost:8766/api/cats?page=1&limit=20', 200, 83));
   });
-  await waitForRows(page, 4);
+  await waitForRows(page, 5);
+  // Light appearance (the stubbed DevTools reports a dark theme).
+  await page.click('#captureBtn');
+  await page.click('#appearance button[data-appearance=light]');
   await page.locator('#requestList li[data-id]').first().click();
   await page.click('#reqTabs button[data-tab=headers]');
   await page.click('#sendBtn');
   await waitForSendDone(page);
+  await page.evaluate(() => document.activeElement?.blur());
   await page.mouse.move(0, 0);
   fs.mkdirSync(path.dirname(out), { recursive: true });
   await page.screenshot({ path: out });

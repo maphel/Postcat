@@ -1,5 +1,5 @@
 // The response pane: status line, headers, and the body as text, JSON, preview or hex dump.
-import { formatBytes, formatTime, describeBody, formatBody, tokenizeJson, hexDump, fileNameFor } from '../lib/index.js';
+import { formatBytes, formatTime, captureInfo, describeBody, formatBody, tokenizeJson, hexDump, fileNameFor } from '../lib/index.js';
 import { state, current, nextId } from './state.js';
 import { $, el, statusClass, toast } from './dom.js';
 import { refreshSearch } from './search.js';
@@ -26,10 +26,22 @@ export function renderResponse() {
   $('sendBtn').classList.toggle('cancel', pending);
   $('sendBtn').title = pending ? 'Cancel this request' : 'Send (Enter in the URL field, or ⌘/Ctrl + Enter)';
 
-  const canCompare = !!item.recorded && !!sent && !pending && !sent.cancelled;
+  // Recorded / Sent is a choice only when both exist: then it is the select. With one source it is a
+  // plain label (never a disabled dropdown); while sending, after a cancel or without any response, nothing.
+  const hasSent = !!sent && !pending && !sent.cancelled;
+  const canCompare = !!item.recorded && hasSent;
   const view = canCompare ? item.view || 'sent' : null;
-  $('resSource').hidden = !canCompare;
-  for (const b of $('resSource').querySelectorAll('button')) b.classList.toggle('active', b.dataset.view === view);
+  // The capture details (time, type, duration) live in the tooltips of the Recorded label / select.
+  const captured = item.recorded ? captureInfo(item) : '';
+  const source = $('resSource');
+  source.hidden = !canCompare;
+  if (canCompare) source.value = view;
+  source.title = `Recorded from the page (${captured}), or the response to your last send`;
+  const label = $('resSourceLabel');
+  const only = hasSent ? 'sent' : item.recorded && !pending && !sent?.cancelled ? 'recorded' : null;
+  label.hidden = canCompare || !only;
+  label.textContent = only === 'sent' ? 'Sent' : 'Recorded';
+  label.title = only === 'sent' ? 'The response to your last send' : captured;
 
   if (pending) {
     showResponse({ pending: true, placeholder: 'Sending…' });
@@ -43,8 +55,12 @@ export function renderResponse() {
     // Still arriving from DevTools? fetchRecordedBody's callback renders it.
     if (item.recordedBody) showRecordedBody(item);
   } else {
-    showResponse({ placeholder: 'Hit Send to see the response.' });
+    showResponse({ placeholder: 'No response yet.\nSend this request to see its response.' });
   }
+  const badge = $('viewResStatus');
+  const shownStatus = pending ? '…' : sent?.cancelled ? '' : sent && view !== 'recorded' ? (sent.error ? 0 : sent.status) : item.recorded?.status;
+  badge.textContent = shownStatus == null || shownStatus === '' ? '' : String(shownStatus || 'ERR');
+  badge.className = `status ${shownStatus == null || shownStatus === '' || pending ? '' : statusClass(shownStatus)}`;
 }
 
 function showResponse({ status, statusText, time, size, headers, body, bodyBase64, tooLarge, mimeType, redirected, url, placeholder, error, pending }) {
@@ -52,9 +68,11 @@ function showResponse({ status, statusText, time, size, headers, body, bodyBase6
   if (pending) {
     pill.textContent = '…';
     pill.className = 'pill pending';
+    pill.title = '';
   } else {
     pill.textContent = status == null ? '' : `${status || 'ERR'} ${statusText || ''}`.trim();
     pill.className = `pill ${status == null ? '' : statusClass(status)}`;
+    pill.title = pill.textContent; // the pill ellipsizes in narrow panes
   }
   $('resTime').textContent = formatTime(time);
   $('resSize').textContent = formatBytes(size);
@@ -83,10 +101,9 @@ function renderResponseHeaders(headers) {
 }
 
 export function renderResTab() {
-  for (const b of $('resTabs').querySelectorAll('button[data-tab]')) b.classList.toggle('active', b.dataset.tab === state.resTab);
+  for (const b of $('resTabs').querySelectorAll('button[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === state.resTab));
   $('resBodyWrap').hidden = state.resTab !== 'resBody';
   $('resHeaders').hidden = state.resTab !== 'resHeaders';
-  $('resMode').style.visibility = state.resTab === 'resBody' ? '' : 'hidden';
   updateBodyActions();
   refreshSearch();
 }
@@ -180,7 +197,6 @@ function setBodyNotice(text, action) {
   shownText = null;
   clearPreview();
   $('resBody').hidden = true;
-  $('resMode').hidden = true;
   const root = $('resPreview');
   root.hidden = false;
   root.className = 'preview';
@@ -194,7 +210,6 @@ function setBodyNotice(text, action) {
 function setBodyText(text, className) {
   clearPreview();
   $('resPreview').hidden = true;
-  $('resMode').hidden = !shown || !PREVIEWABLE.has(shown.model.kind);
   const out = $('resBody');
   out.hidden = false;
   out.className = `output scroll ${className || ''}`;
@@ -211,7 +226,12 @@ function renderContent(model, url) {
     return;
   }
   const mode = PREVIEWABLE.has(model.kind) ? state.resModes[model.kind] || 'preview' : 'raw';
-  for (const b of $('resMode').querySelectorAll('button')) b.classList.toggle('active', b.dataset.mode === mode);
+  for (const b of $('resMode').querySelectorAll('button')) {
+    b.classList.toggle('active', b.dataset.mode === mode);
+    b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+  }
+  $('resPreviewItem').setAttribute('aria-checked', String(mode === 'preview'));
+  $('resRawItem').setAttribute('aria-checked', String(mode === 'raw'));
   if (mode === 'preview') renderPreview(model, url);
   else renderRaw(model);
 }
@@ -246,7 +266,6 @@ function renderBody(raw) {
 function renderPreview(model, url) {
   clearPreview();
   $('resBody').hidden = true;
-  $('resMode').hidden = false;
   const root = $('resPreview');
   root.hidden = false;
   root.className = 'preview';
@@ -353,10 +372,48 @@ function escapeAttr(s) {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
+// The body actions of the response header: Preview/Raw, Copy and Save are inline controls. When the
+// header overflows, its controls collapse lowest priority first (COLLAPSE, below), and the ⋯ menu
+// offers exactly the collapsed actions, so nothing is ever offered twice; it disappears when
+// everything fits. Measured rather than keyed to fixed widths, because the room needed depends on
+// the content (Recorded/Sent as label or select, Preview/Raw or not, header counts). Runs on every
+// render and, through the ResizeObserver below, on every pane resize.
+const ACTIONS = [
+  // [inline control, its menu items, applies?]
+  ['resMode', ['resPreviewItem', 'resRawItem'], () => !!shown && PREVIEWABLE.has(shown.model.kind)],
+  ['resCopy', ['copyResBtn'], () => shownText != null],
+  ['resSave', ['saveResBtn'], () => !!shown],
+];
+const COLLAPSE = [['resCopy', 'resSave'], ['resMode'], ['resSize'], ['resTime']]; // first to go first
 function updateBodyActions() {
   const onBody = state.resTab === 'resBody';
-  $('copyResBtn').hidden = !onBody || shownText == null;
-  $('saveResBtn').hidden = !onBody || !shown;
+  for (const [inlineId, , applies] of ACTIONS) $(inlineId).hidden = !onBody || !applies();
+  // The menu mirrors the collapsed actions; the ⋯ button takes room itself, so it is synced before
+  // each measurement.
+  const syncMenu = () => {
+    let collapsed = 0;
+    for (const [inlineId, itemIds] of ACTIONS) {
+      const inline = $(inlineId);
+      const inMenu = !inline.hidden && inline.classList.contains('collapsed');
+      for (const itemId of itemIds) $(itemId).hidden = !inMenu;
+      if (inMenu) collapsed++;
+    }
+    $('resMenuBtn').hidden = !collapsed;
+  };
+  // Fit: the pill shrinks to its minimum, then the header overflows and the next group collapses.
+  const head = $('resTabs');
+  const overflows = () => head.scrollWidth > head.clientWidth;
+  for (const group of COLLAPSE) for (const id of group) $(id).classList.remove('collapsed');
+  syncMenu();
+  for (const group of COLLAPSE) {
+    if (!overflows()) break;
+    for (const id of group) $(id).classList.add('collapsed');
+    syncMenu();
+  }
+}
+
+export function initResponse() {
+  new ResizeObserver(updateBodyActions).observe($('resPane'));
 }
 
 export function saveResponseBody() {
