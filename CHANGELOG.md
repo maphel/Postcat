@@ -7,6 +7,9 @@ All notable changes to Postcat are listed here. The format is based on
 
 <!-- Entries go under ### Added / ### Changed / ### Fixed / ### Removed; add only the subsections you need. -->
 
+### Changed
+- Replace the app icon with a cat and arrow-shaped smile, and add it to the README.
+
 ## 0.1.0 — 2026-09-23
 
 First public release.
