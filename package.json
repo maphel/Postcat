@@ -35,6 +35,5 @@
     "api-client"
   ],
   "homepage": "https://github.com/maphel/Postcat",
-  "bugs": "https://github.com/maphel/Postcat/issues",
-  "author": "Marcel Christophel"
+  "bugs": "https://github.com/maphel/Postcat/issues"
 }
