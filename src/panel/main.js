@@ -5,7 +5,7 @@ import { loadStorage, persistSettings, flushPending } from './storage.js';
 import { $, toast, copyText, isTyping, initMenus } from './dom.js';
 import { renderList } from './list.js';
 import { renderEditor, renderReqTab, afterEdit, paramsKv, headersKv } from './editor.js';
-import { renderResponse, renderResTab, setBodyMode, saveResponseBody, shownBodyText } from './response.js';
+import { renderResponse, renderResTab, setBodyMode, saveResponseBody, shownBodyText, initResponse } from './response.js';
 import { send, cancelSend, isSending } from './sending.js';
 import { addCaptured, importEntries } from './capture.js';
 import { onSearch } from './search.js';
@@ -136,10 +136,14 @@ $('resMode').addEventListener('click', (e) => {
 });
 $('resModeItem').addEventListener('click', (e) => setBodyMode(e.currentTarget.dataset.mode));
 
-$('copyResBtn').addEventListener('click', () => {
+// Copy and Save: inline icon buttons, or the ⋯ menu's items when the pane is too narrow for them.
+const copyResponse = () => {
   const text = shownBodyText();
   if (text != null) copyText(text, 'Response copied');
-});
+};
+$('resCopy').addEventListener('click', copyResponse);
+$('copyResBtn').addEventListener('click', copyResponse);
+$('resSave').addEventListener('click', saveResponseBody);
 $('saveResBtn').addEventListener('click', saveResponseBody);
 
 // ---------- sidebar ----------
@@ -268,6 +272,7 @@ loadStorage().then(() => {
   for (const entry of buffered) addCaptured(entry);
   applyXhrOnly();
   initLayout();
+  initResponse();
   setRecording(true);
   setFilter(state.filterText);
   switchTab(state.tab);

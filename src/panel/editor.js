@@ -82,10 +82,14 @@ export function renderReqTab() {
   $('headersView').hidden = tab !== 'headers' || state.bulkHeaders;
   $('headers').hidden = tab !== 'headers' || !state.bulkHeaders;
   $('body').hidden = tab !== 'body';
-  $('bulkBtn').hidden = tab !== 'headers';
-  $('bulkBtn').textContent = state.bulkHeaders ? 'Table view' : 'Bulk edit';
+  // One contextual action per tab (none on Params): Bulk edit / Table view on Headers, Beautify on Body.
+  const bulk = $('bulkBtn');
+  bulk.hidden = tab !== 'headers';
+  bulk.querySelector('.label').textContent = state.bulkHeaders ? 'Table view' : 'Bulk edit';
+  bulk.setAttribute('aria-label', state.bulkHeaders ? 'Table view' : 'Bulk edit');
+  bulk.title = state.bulkHeaders ? 'Edit the headers in a table' : 'Edit the headers as plain text';
+  $('bulkIcon').setAttribute('href', state.bulkHeaders ? '#i-table' : '#i-lines');
   $('beautifyBtn').hidden = tab !== 'body';
-  $('reqMenuBtn').hidden = tab === 'params'; // nothing to offer there
   const item = current();
   if (item) renderBodyStatus(item);
 }

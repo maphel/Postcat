@@ -43,17 +43,20 @@ plain text or `/regex/`. The selector above the list switches between **Captured
 **Editing** a captured request marks it with ● in the list; **Reset to recorded** (in the ⋯ menu
 next to Send, together with Duplicate, Copy as cURL and Delete) restores the recorded version.
 **Save** (bookmark icon) copies it into the collection, where changes are saved automatically.
-The ⋯ menu of the request pane offers **Bulk edit** for headers and **Beautify JSON** for the body.
+The request tabs carry one action each: **Bulk edit** / **Table view** on Headers and
+**Beautify** on Body (icon only in a narrow pane).
 
 **Sending** shows the status, timing and size. While a request runs, the button turns into
 **Cancel**. Failures explain the cause (unreachable host, timeout, invalid header, offline).
-For captured requests, **Recorded / Sent** selects the source of the response; **Body** and
-**Headers** are tabs in the response header and follow the selected source.
+Once a captured request has also been sent, **Recorded / Sent** selects the source of the
+response (with a single source it is just a label); **Body** and **Headers** are tabs in the
+response header and follow the selected source.
 
 **Responses** are shown by type; **Preview / Raw** switches between the rendered view and the
-source or hex dump (in a narrow response pane the switch sits in the response ⋯ menu, together
-with **Copy body** and **Save body as file**). The type is taken from the `Content-Type` header,
-or sniffed from the first bytes when the header is missing or generic.
+source or hex dump, next to **Copy** and **Save as file**. When the response pane is too narrow
+for them, these controls move into a ⋯ menu that holds only what no longer fits inline. The type
+is taken from the `Content-Type` header, or sniffed from the first bytes when the header is
+missing or generic.
 
 **Docking.** The layout follows the width of the panel: wide panels show the list, the request
 editor and the response side by side; medium ones keep the list and switch between **Request**

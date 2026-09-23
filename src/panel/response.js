@@ -26,14 +26,19 @@ export function renderResponse() {
   $('sendBtn').classList.toggle('cancel', pending);
   $('sendBtn').title = pending ? 'Cancel this request' : 'Send (Enter in the URL field, or ⌘/Ctrl + Enter)';
 
-  // Recorded / Sent: shown for captured requests; "Sent" becomes available after a finished send.
-  const canCompare = !!item.recorded && !!sent && !pending && !sent.cancelled;
+  // Recorded / Sent is a choice only when both exist: then it is the select. With one source it is a
+  // plain label (never a disabled dropdown); while sending, after a cancel or without any response, nothing.
+  const hasSent = !!sent && !pending && !sent.cancelled;
+  const canCompare = !!item.recorded && hasSent;
   const view = canCompare ? item.view || 'sent' : null;
   const source = $('resSource');
-  source.hidden = !item.recorded;
-  source.disabled = !canCompare;
-  source.value = view || (sent && !sent.cancelled ? 'sent' : 'recorded');
-  source.querySelector('option[value=sent]').disabled = !canCompare;
+  source.hidden = !canCompare;
+  if (canCompare) source.value = view;
+  const label = $('resSourceLabel');
+  const only = hasSent ? 'sent' : item.recorded && !pending && !sent?.cancelled ? 'recorded' : null;
+  label.hidden = canCompare || !only;
+  label.textContent = only === 'sent' ? 'Sent' : 'Recorded';
+  label.title = only === 'sent' ? 'The response to your last send' : 'Recorded from the page';
 
   if (pending) {
     showResponse({ pending: true, placeholder: 'Sending…' });
@@ -96,7 +101,6 @@ export function renderResTab() {
   for (const b of $('resTabs').querySelectorAll('button[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === state.resTab));
   $('resBodyWrap').hidden = state.resTab !== 'resBody';
   $('resHeaders').hidden = state.resTab !== 'resHeaders';
-  $('resMode').style.visibility = state.resTab === 'resBody' ? '' : 'hidden';
   updateBodyActions();
   refreshSearch();
 }
@@ -190,7 +194,6 @@ function setBodyNotice(text, action) {
   shownText = null;
   clearPreview();
   $('resBody').hidden = true;
-  $('resMode').hidden = true;
   const root = $('resPreview');
   root.hidden = false;
   root.className = 'preview';
@@ -204,7 +207,6 @@ function setBodyNotice(text, action) {
 function setBodyText(text, className) {
   clearPreview();
   $('resPreview').hidden = true;
-  $('resMode').hidden = !shown || !PREVIEWABLE.has(shown.model.kind);
   const out = $('resBody');
   out.hidden = false;
   out.className = `output scroll ${className || ''}`;
@@ -261,7 +263,6 @@ function renderBody(raw) {
 function renderPreview(model, url) {
   clearPreview();
   $('resBody').hidden = true;
-  $('resMode').hidden = false;
   const root = $('resPreview');
   root.hidden = false;
   root.className = 'preview';
@@ -368,14 +369,32 @@ function escapeAttr(s) {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-// The ⋯ menu of the response pane: Preview/Raw (for narrow panes, where the switch is hidden), Copy, Save.
+// The body actions of the response header: Preview/Raw, Copy and Save are inline controls that
+// panel.css collapses (container queries on the pane) when the pane is too narrow for them. The ⋯
+// menu offers exactly the collapsed ones, so nothing is ever offered twice; it disappears when
+// everything fits. Runs on every render and, through the ResizeObserver below, on every pane resize.
+const ACTIONS = [
+  // [inline control, menu item, applies?]
+  ['resMode', 'resModeItem', () => !!shown && PREVIEWABLE.has(shown.model.kind)],
+  ['resCopy', 'copyResBtn', () => shownText != null],
+  ['resSave', 'saveResBtn', () => !!shown],
+];
 function updateBodyActions() {
   const onBody = state.resTab === 'resBody';
-  const previewable = !!shown && PREVIEWABLE.has(shown.model.kind) && !$('resMode').hidden;
-  $('resModeItem').hidden = !onBody || !previewable;
-  $('copyResBtn').hidden = !onBody || shownText == null;
-  $('saveResBtn').hidden = !onBody || !shown;
-  $('resMenuBtn').hidden = !onBody || !shown;
+  let collapsed = 0;
+  for (const [inlineId, itemId, applies] of ACTIONS) {
+    const inline = $(inlineId);
+    inline.hidden = !onBody || !applies();
+    // Not `hidden` but not displayed: the container query collapsed it.
+    const inMenu = !inline.hidden && getComputedStyle(inline).display === 'none';
+    $(itemId).hidden = !inMenu;
+    if (inMenu) collapsed++;
+  }
+  $('resMenuBtn').hidden = !collapsed;
+}
+
+export function initResponse() {
+  new ResizeObserver(updateBodyActions).observe($('resPane'));
 }
 
 export function saveResponseBody() {

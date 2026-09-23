@@ -150,6 +150,10 @@ function ok(name, condition, detail) {
     await page.keyboard.press('Escape');
     return visible;
   };
+  // Response body actions are inline controls that move into the response ⋯ menu when the pane is
+  // too narrow for them: use the inline control when it is shown, else the menu item.
+  const bodyAction = async (inline, item) => ((await page.isVisible(inline)) ? page.click(inline) : viaMenu('#resMenuBtn', item));
+  const bodyActionOffered = async (inline, item) => (await page.isVisible(inline)) || (await page.isVisible('#resMenuBtn') && inMenu('#resMenuBtn', item));
   // chrome.storage writes are debounced (storage.js): waits until `key` holds a record `test`
   // accepts (page.waitForFunction can't await the async storage API), then returns what is there.
   const stored = async (key, test = () => true, timeout = 2000) => {
@@ -223,7 +227,7 @@ function ok(name, condition, detail) {
   check('Backspace on a menu item deletes nothing', [await rows(), await selectedId()], [rowsBeforeMenu, selectedBeforeMenu]);
   await page.keyboard.press('Escape');
   check('Escape closes the menu', await page.getAttribute('#moreBtn', 'aria-expanded'), 'false');
-  check('menu triggers announce their menu', await page.evaluate(() => [...document.querySelectorAll('[popovertarget]')].map((b) => b.getAttribute('aria-haspopup'))), ['menu', 'menu', 'menu', 'menu']);
+  check('menu triggers announce their menu', await page.evaluate(() => [...document.querySelectorAll('[popovertarget]')].map((b) => b.getAttribute('aria-haspopup'))), ['menu', 'menu', 'menu']);
 
   await viaMenu('#moreBtn', '#resetBtn');
   await settle(() => !document.querySelector('#requestList li .edited'));
@@ -322,7 +326,7 @@ function ok(name, condition, detail) {
   await pick('/media/img.png');
   check('recorded image previewed', await imgLoaded(), true);
   match('image caption', await page.textContent('#resPreview .caption'), /^1 × 1 · image\/png/);
-  const [download] = await Promise.all([page.waitForEvent('download', { timeout: 3000 }).catch(() => null), viaMenu('#resMenuBtn', '#saveResBtn')]);
+  const [download] = await Promise.all([page.waitForEvent('download', { timeout: 3000 }).catch(() => null), bodyAction('#resSave', '#saveResBtn')]);
   check('Save downloads the file', download?.suggestedFilename(), 'img.png');
   await page.click('#resMode button[data-mode=raw]');
   includes('raw view is a hex dump', await page.textContent('#resBody'), '|.PNG');
@@ -338,8 +342,8 @@ function ok(name, condition, detail) {
   const binHex = await page.textContent('#resBody');
   match('binary shows its type', binHex, /^application\/octet-stream/);
   includes('binary hex dump', binHex, '00 01 02 03');
-  check('Copy not offered for binary', await inMenu('#resMenuBtn', '#copyResBtn'), false);
-  check('Save offered for binary', await inMenu('#resMenuBtn', '#saveResBtn'), true);
+  check('Copy not offered for binary', await bodyActionOffered('#resCopy', '#copyResBtn'), false);
+  check('Save offered for binary', await bodyActionOffered('#resSave', '#saveResBtn'), true);
 
   await pick('/media/page.html');
   check('HTML shown raw by default', await page.textContent('#resBody'), '<h1>Hello page</h1>');
@@ -359,9 +363,10 @@ function ok(name, condition, detail) {
   await page.click('#newListBtn');
   await page.selectOption('#method', 'POST');
   await page.click('#reqTabs button[data-tab=headers]');
-  await viaMenu('#reqMenuBtn', '#bulkBtn');
+  await page.click('#bulkBtn');
+  check('Bulk edit becomes Table view', await page.evaluate(() => [document.getElementById('bulkBtn').textContent, document.getElementById('bulkBtn').getAttribute('aria-label')]), ['Table view', 'Table view']);
   await page.fill('#headers', 'Content-Type: multipart/form-data; boundary=x');
-  await viaMenu('#reqMenuBtn', '#bulkBtn');
+  await page.click('#bulkBtn');
   await page.click('#reqTabs button[data-tab=body]');
   await page.fill('#body', '--x\r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n--x--');
   match('multipart warning', await page.textContent('#bodyStatus'), /^⚠ Multipart/);
@@ -376,6 +381,8 @@ function ok(name, condition, detail) {
   await page.press('#url', 'Enter');
   await sendDone();
   check('Enter sends', JSON.parse(await page.textContent('#resBody')).url, '/echo?x=1');
+  // A never-captured request has one source: a plain "Sent" label, no selector.
+  check('Sent label for a new request, no source selector', [await page.textContent('#resSourceLabel'), await page.isVisible('#resSourceLabel'), await page.isVisible('#resSource')], ['Sent', true, false]);
 
   // Search through DevTools' search bar (devtools.js forwards to window.postcatSearch).
   // Expected count straight from the rendered text (case-insensitive, non-overlapping).
@@ -431,7 +438,7 @@ function ok(name, condition, detail) {
   await page.selectOption('#method', 'POST');
   await page.click('#reqTabs button[data-tab=body]');
   await page.fill('#body', '{"id":12345678901234567890}');
-  await viaMenu('#reqMenuBtn', '#beautifyBtn');
+  await page.click('#beautifyBtn');
   check('Beautify keeps big integers', await page.inputValue('#body'), '{\n  "id": 12345678901234567890\n}');
 
   // Editing one query param keeps the others byte-for-byte.
@@ -539,20 +546,48 @@ function ok(name, condition, detail) {
   check('sidebar width default', afterReload.sidebarW, '214px');
 
   // ---------- layouts: wide / medium / narrow follow the panel width ----------
-  // One captured request with a recorded response and distinctive headers, replayed later for Recorded / Sent.
-  // Its long status text must not push the source select or the ⋯ button out of the response header.
+  // One captured request with a recorded HTML response (so Preview / Raw applies) and distinctive
+  // headers, replayed later for Recorded / Sent. Its long status text must not push anything out of
+  // the response header: the pill ellipsizes, the actions collapse into the ⋯ menu.
   await page.setViewportSize({ width: 1024, height: 320 });
   await page.selectOption('#collection', 'captured');
   await page.evaluate(() => __emit(harEntry({
-    started: 'layout-1', time: 7, url: 'http://localhost:8765/layout?x=1', status: 500, statusText: 'Internal Server Error',
-    resHeaders: [{ name: 'content-type', value: 'application/json' }, { name: 'x-source', value: 'recorded' }], content: '{"recorded":true}',
+    started: 'layout-1', time: 7, url: 'http://localhost:8765/layout?x=1', status: 500, statusText: 'Internal Server Error', mime: 'text/html',
+    resHeaders: [{ name: 'content-type', value: 'text/html' }, { name: 'x-source', value: 'recorded' }], content: '<h1>recorded</h1>',
   })));
   await listHas(1, 'layout fixture');
   await page.locator('#requestList li[data-id]').first().click();
   check('long status text in the pill and its title', [await page.textContent('#resStatus'), await page.getAttribute('#resStatus', 'title')], ['500 Internal Server Error', '500 Internal Server Error']);
-  // Both pane headers with their ⋯ buttons shown (the request ⋯ is hidden on Params; the response ⋯ needs the Body tab).
+  // Recorded only: a plain label, no selector to choose from.
+  check('Recorded label before a send, no source selector', [await page.textContent('#resSourceLabel'), await page.isVisible('#resSourceLabel'), await page.isVisible('#resSource')], ['Recorded', true, false]);
+  // No ⋯ in the request pane; each tab carries its own action (Headers: Bulk edit, Body: Beautify, Params: none).
+  check('no request-pane ⋯ menu', await page.evaluate(() => [document.getElementById('reqMenuBtn'), document.querySelector('#reqTabs [popovertarget]')]), [null, null]);
+  const reqActions = () => page.evaluate(() => [document.getElementById('bulkBtn').checkVisibility(), document.getElementById('beautifyBtn').checkVisibility()]);
+  await page.click('#reqTabs button[data-tab=params]');
+  check('Params: no contextual action', await reqActions(), [false, false]);
+  await page.click('#reqTabs button[data-tab=body]');
+  check('Body: Beautify only', [...await reqActions(), await page.textContent('#beautifyBtn'), await page.getAttribute('#beautifyBtn', 'aria-label')], [false, true, 'Beautify', 'Beautify JSON']);
   await page.click('#reqTabs button[data-tab=headers]');
+  check('Headers: Bulk edit only', [...await reqActions(), await page.textContent('#bulkBtn')], [true, false, 'Bulk edit']);
   await page.click('#resTabs button[data-tab=resBody]');
+
+  // Body actions (Preview/Raw, Copy, Save): inline, or in the ⋯ menu when the pane is too narrow.
+  const PAIRS = [['resMode', 'resModeItem'], ['resCopy', 'copyResBtn'], ['resSave', 'saveResBtn']];
+  const bodyActions = () => page.evaluate((pairs) => ({
+    inline: pairs.map(([a]) => a).filter((id) => document.getElementById(id).checkVisibility()),
+    menu: pairs.map(([, b]) => b).filter((id) => !document.getElementById(id).hidden),
+    menuBtn: document.getElementById('resMenuBtn').checkVisibility(),
+  }), PAIRS);
+  // Each action is offered exactly once; the menu follows the pane's ResizeObserver, so wait for it.
+  const settleActions = () => settle((pairs) => pairs.every(([a, b]) => document.getElementById(a).checkVisibility() === document.getElementById(b).hidden), PAIRS);
+  // Visible controls of a pane header that stick out of the pane (the header clips what overflows).
+  const clipped = (paneId, headId) => page.evaluate(([paneId, headId]) => {
+    const pane = document.getElementById(paneId).getBoundingClientRect();
+    return [...document.querySelectorAll(`#${headId} > *, #${headId} [role=tab]`)]
+      .filter((el) => el.checkVisibility() && el.getBoundingClientRect().width > 0)
+      .filter((el) => { const r = el.getBoundingClientRect(); return r.left < pane.left - .5 || r.right > pane.right + .5 || r.top < pane.top - .5 || r.bottom > pane.bottom + .5; })
+      .map((el) => el.id || el.textContent.trim());
+  }, [paneId, headId]);
   const modeFor = (w) => (w >= 850 ? 'wide' : w >= 580 ? 'medium' : 'narrow');
   const resize = async (w, h) => {
     await page.setViewportSize({ width: w, height: h });
@@ -574,16 +609,6 @@ function ok(name, condition, detail) {
       listScrolls: document.getElementById('requestList').scrollHeight > document.getElementById('requestList').clientHeight,
     };
   });
-  // Whether each control is rendered and lies entirely inside the pane's box (a pane header clips
-  // what overflows, so a pushed-out control would be invisible but still have a rect outside the pane).
-  const fits = (paneId, selectors) => page.evaluate(([paneId, selectors]) => {
-    const pane = document.getElementById(paneId).getBoundingClientRect();
-    return selectors.map((sel) => {
-      const el = document.querySelector(sel);
-      const r = el.getBoundingClientRect();
-      return el.checkVisibility() && r.width > 0 && r.left >= pane.left - .5 && r.right <= pane.right + .5 && r.top >= pane.top - .5 && r.bottom <= pane.bottom + .5;
-    });
-  }, [paneId, selectors]);
   for (const [w, h] of [[1024, 320], [1024, 240], [850, 300], [680, 280], [580, 240], [380, 480], [320, 260]]) {
     await resize(w, h);
     const s = await shape();
@@ -596,10 +621,45 @@ function ok(name, condition, detail) {
     else check(`${w}×${h}: details fill the width`, [s.screen, s.list, s.switcher, s.req || s.res], ['detail', false, true, true]);
     // Only one pane is shown outside the wide layout: switch to each before measuring its header.
     if (mode !== 'wide') await page.click('#viewTabs button[data-view=response]');
-    check(`${w}×${h}: status, source and ⋯ inside the response pane`, await fits('resPane', ['#resStatus', '#resSource', '#resMenuBtn']), [true, true, true]);
+    await settleActions();
+    const a = await bodyActions();
+    check(`${w}×${h}: each body action offered once, ⋯ only when something is collapsed`, [a.inline.length + a.menu.length, a.menuBtn], [3, a.menu.length > 0]);
+    check(`${w}×${h}: nothing clipped in the response header`, await clipped('resPane', 'resTabs'), []);
     if (mode !== 'wide') await page.click('#viewTabs button[data-view=request]');
-    check(`${w}×${h}: tabs and ⋯ inside the request pane`, await fits('reqPane', ['#reqTabs [data-tab=body]', '#reqMenuBtn']), [true, true]);
+    check(`${w}×${h}: nothing clipped in the request header`, await clipped('reqPane', 'reqTabs'), []);
+    check(`${w}×${h}: Bulk edit inside the request pane`, await page.evaluate(() => document.getElementById('bulkBtn').checkVisibility()), true);
   }
+
+  // Wide bottom dock: everything inline, no ⋯. Narrow side dock: everything in the ⋯, nothing inline.
+  await resize(1024, 320);
+  await settleActions();
+  check('1024×320: Preview/Raw, Copy and Save inline, no ⋯ menu', await bodyActions(), { inline: ['resMode', 'resCopy', 'resSave'], menu: [], menuBtn: false });
+  check('1024×320: Copy and Save are labelled icon buttons', await page.evaluate(() => ['resCopy', 'resSave'].map((id) => [document.getElementById(id).getAttribute('aria-label'), document.getElementById(id).title])), [['Copy body', 'Copy the response body'], ['Save body as file', 'Save the response body as a file']]);
+  await resize(320, 260);
+  await page.click('#viewTabs button[data-view=response]');
+  await settleActions();
+  check('320×260: all body actions in the ⋯ menu, none inline', await bodyActions(), { inline: [], menu: ['resModeItem', 'copyResBtn', 'saveResBtn'], menuBtn: true });
+  await page.click('#resMenuBtn');
+  check('320×260: the open ⋯ menu shows exactly the collapsed actions', await page.evaluate(() => [...document.querySelectorAll('#resMenu [role=menuitem]')].filter((b) => b.checkVisibility()).map((b) => b.textContent)), ['Show preview', 'Copy body', 'Save body as file…']);
+  await page.keyboard.press('Escape');
+  await page.click('#viewTabs button[data-view=request]');
+
+  // A narrow request pane (split dragged in the wide layout) keeps the action as an icon with its name in aria-label and title.
+  await resize(1024, 320);
+  const handle = await page.locator('#splitResizer').boundingBox();
+  const split = await page.locator('#split').boundingBox();
+  await page.mouse.move(handle.x + 2, handle.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(split.x + split.width * 0.3, handle.y + 40, { steps: 4 });
+  await page.mouse.up();
+  await settle(() => document.getElementById('reqPane').clientWidth < 270);
+  check('narrow request pane: icon-only Bulk edit with its name', await page.evaluate(() => {
+    const b = document.getElementById('bulkBtn');
+    return [document.getElementById('reqPane').clientWidth < 270, b.querySelector('.label').checkVisibility(), b.getBoundingClientRect().width <= 30, b.getAttribute('aria-label'), b.title.length > 0];
+  }), [true, false, true, 'Bulk edit', true]);
+  await page.dblclick('#splitResizer');
+  await settle(() => document.getElementById('bulkBtn').querySelector('.label').checkVisibility());
+  check('split reset restores the label', await page.evaluate(() => document.getElementById('bulkBtn').querySelector('.label').checkVisibility()), true);
 
   // Drafts and the selection survive crossing both breakpoints while editing URL, param, header and body.
   await resize(1024, 320);
@@ -660,12 +720,14 @@ function ok(name, condition, detail) {
   await page.click('#resTabs button[data-tab=resHeaders]');
   includes('recorded headers (narrow)', await page.textContent('#resHeaders'), 'x-source');
   await page.click('#resTabs button[data-tab=resBody]');
-  includes('recorded body (narrow)', await page.textContent('#resBody'), '"recorded": true');
+  includes('recorded body (narrow)', await page.textContent('#resBody'), '<h1>recorded</h1>');
   await page.click('#viewTabs button[data-view=request]');
   await page.click('#sendBtn');
   await sendDone();
   check('Send reveals the response', await page.evaluate(() => document.getElementById('app').dataset.view), 'response');
   check('Sent selected after the send', await page.inputValue('#resSource'), 'sent');
+  // Recorded and sent both exist now: the selector replaces the label and offers both sources.
+  check('source selector with both options once both exist', await page.evaluate(() => [document.getElementById('resSource').checkVisibility(), document.getElementById('resSourceLabel').checkVisibility(), [...document.getElementById('resSource').options].map((o) => [o.value, o.disabled])]), [true, false, [['recorded', false], ['sent', false]]]);
   includes('sent body', await page.textContent('#resBody'), '"url": "/layout?x=1&keep=kept"');
   await page.click('#resTabs button[data-tab=resHeaders]');
   const sentHeaders = await page.textContent('#resHeaders');
@@ -673,7 +735,7 @@ function ok(name, condition, detail) {
   await page.selectOption('#resSource', 'recorded');
   includes('recorded headers after switching the source', await page.textContent('#resHeaders'), 'x-source');
   await page.click('#resTabs button[data-tab=resBody]');
-  includes('recorded body after switching the source', await page.textContent('#resBody'), '"recorded": true');
+  includes('recorded body after switching the source', await page.textContent('#resBody'), '<h1>recorded</h1>');
   await resize(1024, 320);
   await page.selectOption('#resSource', 'sent');
   await page.click('#resTabs button[data-tab=resHeaders]');
@@ -685,7 +747,7 @@ function ok(name, condition, detail) {
   // A request without a response shows an empty state, not a status.
   await page.click('#newListBtn');
   includes('empty response state', await page.textContent('#resBody'), 'No response yet');
-  check('no status without a response', [await page.textContent('#resStatus'), await page.textContent('#viewResStatus'), await page.isVisible('#resSource')], ['', '', false]);
+  check('no status, source or body actions without a response', [await page.textContent('#resStatus'), await page.textContent('#viewResStatus'), await page.isVisible('#resSource'), await page.isVisible('#resSourceLabel'), await page.isVisible('#resMenuBtn'), await page.isVisible('#resCopy')], ['', '', false, false, false, false]);
 
   // Appearance: Light / Dark / System, persisted with the settings.
   await page.click('#captureBtn');

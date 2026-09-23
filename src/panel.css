@@ -170,6 +170,7 @@ kbd {
   overflow: auto;
 }
 .menu > button {
+  display: flex; /* block-level: one item per line even inside a `white-space: nowrap` pane header */
   width: 100%;
   justify-content: flex-start;
   text-align: left;
@@ -388,13 +389,31 @@ body.resizing { cursor: col-resize; user-select: none; }
 .switcher > [role=tab] { font-size: 12px; }
 .switcher > [role=tab]:hover, .pane-head [role=tab]:hover { background: transparent; color: var(--text); }
 .switcher > [role=tab][aria-selected=true], .pane-head [role=tab][aria-selected=true] { border-bottom-color: var(--accent); color: var(--text); }
-.pane-head .icon { margin-right: -4px; }
+.pane-head .flush { margin-right: -4px; }
+.response-head { gap: 6px; }
+.response-head .tabgroup { margin-right: 2px; }
 .source { max-width: 96px; padding: 1px 4px; flex-shrink: 0; }
+.source-label { color: var(--muted); font-size: 11px; flex-shrink: 0; }
+#resSave { margin-left: -4px; }
 
-/* Hide the least essential meta first when the pane gets narrow; the Preview/Raw switch moves into the ⋯ menu.
-   The status pill (below) is the only element that shrinks, so the source select and the ⋯ button always stay in the pane. */
-@container (max-width: 470px) { #resSize { display: none; } #resMode { display: none; } }
-@container (max-width: 380px) { #resTime { display: none; } }
+/* The request header's contextual action (Bulk edit / Table view, Beautify): text with an icon,
+   icon only in a narrow pane (aria-label and title carry the name). */
+.ctx { color: var(--muted); font-size: 11px; padding: 3px 6px; gap: 4px; }
+.ctx:hover:not(:disabled) { color: var(--text); }
+@container (max-width: 269px) {
+  .ctx { width: 26px; padding: 5px; }
+  .ctx .label { display: none; }
+}
+
+/* Response header, from the pane's width: what doesn't fit collapses, lowest priority first. Time and
+   size just go; Copy/Save and then Preview/Raw move into the ⋯ menu, which response.js fills with
+   exactly the controls hidden here (it reads their computed display). The pill ellipsizes last.
+   The Recorded/Sent select is 30 px wider than the plain label, so it collapses the actions earlier. */
+@container (max-width: 519px) { #resTime, #resSize { display: none; } }
+@container (max-width: 399px) { #resCopy, #resSave { display: none; } }
+@container (max-width: 429px) { .response-head:has(#resSource:not([hidden])) :is(#resCopy, #resSave) { display: none; } }
+@container (max-width: 349px) { #resMode { display: none; } }
+@container (max-width: 399px) { .response-head:has(#resSource:not([hidden])) #resMode { display: none; } }
 
 .editor-text, .output {
   flex: 1;

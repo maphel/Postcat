@@ -14,6 +14,11 @@
   <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M4.5 19.5h15"/></symbol>
+  <symbol id="i-braces" viewBox="0 0 24 24"><path d="M9 3.5c-2.2 0-3 1-3 3v3.3c0 1.3-.9 2.2-2.2 2.2 1.3 0 2.2.9 2.2 2.2v3.3c0 2 .8 3 3 3M15 3.5c2.2 0 3 1 3 3v3.3c0 1.3.9 2.2 2.2 2.2-1.3 0-2.2.9-2.2 2.2v3.3c0 2-.8 3-3 3"/></symbol>
+  <symbol id="i-lines" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M4 10h16M4 14.5h16M10 5v14"/></symbol>
 </svg>
 
 <div class="app" id="app" data-layout="wide" data-screen="detail" data-view="request">
@@ -114,11 +119,9 @@
               <button type="button" role="tab" data-tab="body" aria-controls="body">Body <span id="reqBodyMark" class="dotmark"></span></button>
             </span>
             <span class="push"></span>
-            <button id="reqMenuBtn" class="icon" type="button" popovertarget="reqMenu" aria-haspopup="menu" aria-expanded="false" aria-label="Editor options" title="Editor options"><svg><use href="#i-more"/></svg></button>
-            <div id="reqMenu" class="menu" popover role="menu" aria-label="Editor options">
-              <button id="bulkBtn" type="button" role="menuitem" title="Switch between table and plain text">Bulk edit</button>
-              <button id="beautifyBtn" type="button" role="menuitem" title="Format the JSON body">Beautify JSON</button>
-            </div>
+            <!-- One contextual action per tab; the label drops in a narrow pane (the aria-label and title stay). -->
+            <button id="bulkBtn" class="ctx flush" type="button" aria-label="Bulk edit" title="Edit the headers as plain text"><svg><use id="bulkIcon" href="#i-lines"/></svg><span class="label">Bulk edit</span></button>
+            <button id="beautifyBtn" class="ctx flush" type="button" aria-label="Beautify JSON" title="Format the JSON body"><svg><use href="#i-braces"/></svg><span class="label">Beautify</span></button>
           </div>
           <div id="paramsView" class="kv scroll" role="tabpanel"></div>
           <div id="headersView" class="kv scroll" role="tabpanel"></div>
@@ -140,6 +143,8 @@
             <span id="resSize" class="meta"></span>
             <span class="push"></span>
             <span id="searchCount" class="search-count" hidden></span>
+            <!-- Recorded / Sent is a control only when both exist; with one source it is a plain label. -->
+            <span id="resSourceLabel" class="source-label" hidden></span>
             <select id="resSource" class="quiet source" aria-label="Response source" title="Recorded from the page, or the response to your last send" hidden>
               <option value="recorded">Recorded</option>
               <option value="sent">Sent</option>
@@ -148,11 +153,14 @@
               <button type="button" data-mode="preview" title="Rendered preview">Preview</button>
               <button type="button" data-mode="raw" title="Source text or hex dump">Raw</button>
             </span>
-            <button id="resMenuBtn" class="icon" type="button" popovertarget="resMenu" aria-haspopup="menu" aria-expanded="false" aria-label="Response actions" title="Response actions"><svg><use href="#i-more"/></svg></button>
+            <button id="resCopy" class="icon" type="button" aria-label="Copy body" title="Copy the response body" hidden><svg><use href="#i-copy"/></svg></button>
+            <button id="resSave" class="icon" type="button" aria-label="Save body as file" title="Save the response body as a file" hidden><svg><use href="#i-download"/></svg></button>
+            <!-- The ⋯ menu holds only what the pane is too narrow to show inline (response.js). -->
+            <button id="resMenuBtn" class="icon flush" type="button" popovertarget="resMenu" aria-haspopup="menu" aria-expanded="false" aria-label="Response actions" title="Response actions" hidden><svg><use href="#i-more"/></svg></button>
             <div id="resMenu" class="menu" popover role="menu" aria-label="Response actions">
-              <button id="resModeItem" type="button" role="menuitem">Show raw</button>
-              <button id="copyResBtn" type="button" role="menuitem" title="Copy the response body">Copy body</button>
-              <button id="saveResBtn" type="button" role="menuitem" title="Save the response body as a file">Save body as file…</button>
+              <button id="resModeItem" type="button" role="menuitem" hidden>Show raw</button>
+              <button id="copyResBtn" type="button" role="menuitem" title="Copy the response body" hidden>Copy body</button>
+              <button id="saveResBtn" type="button" role="menuitem" title="Save the response body as a file" hidden>Save body as file…</button>
             </div>
           </div>
           <div id="resRedirect" class="redirect" hidden></div>
