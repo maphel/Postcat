@@ -369,28 +369,44 @@ function escapeAttr(s) {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-// The body actions of the response header: Preview/Raw, Copy and Save are inline controls that
-// panel.css collapses (container queries on the pane) when the pane is too narrow for them. The ⋯
-// menu offers exactly the collapsed ones, so nothing is ever offered twice; it disappears when
-// everything fits. Runs on every render and, through the ResizeObserver below, on every pane resize.
+// The body actions of the response header: Preview/Raw, Copy and Save are inline controls. When the
+// header overflows, its controls collapse lowest priority first (COLLAPSE, below), and the ⋯ menu
+// offers exactly the collapsed actions, so nothing is ever offered twice; it disappears when
+// everything fits. Measured rather than keyed to fixed widths, because the room needed depends on
+// the content (Recorded/Sent as label or select, Preview/Raw or not, header counts). Runs on every
+// render and, through the ResizeObserver below, on every pane resize.
 const ACTIONS = [
   // [inline control, menu item, applies?]
   ['resMode', 'resModeItem', () => !!shown && PREVIEWABLE.has(shown.model.kind)],
   ['resCopy', 'copyResBtn', () => shownText != null],
   ['resSave', 'saveResBtn', () => !!shown],
 ];
+const COLLAPSE = [['resCopy', 'resSave'], ['resMode'], ['resSize'], ['resTime']]; // first to go first
 function updateBodyActions() {
   const onBody = state.resTab === 'resBody';
-  let collapsed = 0;
-  for (const [inlineId, itemId, applies] of ACTIONS) {
-    const inline = $(inlineId);
-    inline.hidden = !onBody || !applies();
-    // Not `hidden` but not displayed: the container query collapsed it.
-    const inMenu = !inline.hidden && getComputedStyle(inline).display === 'none';
-    $(itemId).hidden = !inMenu;
-    if (inMenu) collapsed++;
+  for (const [inlineId, , applies] of ACTIONS) $(inlineId).hidden = !onBody || !applies();
+  // The menu mirrors the collapsed actions; the ⋯ button takes room itself, so it is synced before
+  // each measurement.
+  const syncMenu = () => {
+    let collapsed = 0;
+    for (const [inlineId, itemId] of ACTIONS) {
+      const inline = $(inlineId);
+      const inMenu = !inline.hidden && inline.classList.contains('collapsed');
+      $(itemId).hidden = !inMenu;
+      if (inMenu) collapsed++;
+    }
+    $('resMenuBtn').hidden = !collapsed;
+  };
+  // Fit: the pill shrinks to its minimum, then the header overflows and the next group collapses.
+  const head = $('resTabs');
+  const overflows = () => head.scrollWidth > head.clientWidth;
+  for (const group of COLLAPSE) for (const id of group) $(id).classList.remove('collapsed');
+  syncMenu();
+  for (const group of COLLAPSE) {
+    if (!overflows()) break;
+    for (const id of group) $(id).classList.add('collapsed');
+    syncMenu();
   }
-  $('resMenuBtn').hidden = !collapsed;
 }
 
 export function initResponse() {

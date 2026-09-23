@@ -405,15 +405,10 @@ body.resizing { cursor: col-resize; user-select: none; }
   .ctx .label { display: none; }
 }
 
-/* Response header, from the pane's width: what doesn't fit collapses, lowest priority first. Time and
-   size just go; Copy/Save and then Preview/Raw move into the ⋯ menu, which response.js fills with
-   exactly the controls hidden here (it reads their computed display). The pill ellipsizes last.
-   The Recorded/Sent select is 30 px wider than the plain label, so it collapses the actions earlier. */
-@container (max-width: 519px) { #resTime, #resSize { display: none; } }
-@container (max-width: 399px) { #resCopy, #resSave { display: none; } }
-@container (max-width: 429px) { .response-head:has(#resSource:not([hidden])) :is(#resCopy, #resSave) { display: none; } }
-@container (max-width: 349px) { #resMode { display: none; } }
-@container (max-width: 399px) { .response-head:has(#resSource:not([hidden])) #resMode { display: none; } }
+/* Response header: what doesn't fit collapses, lowest priority first (Copy/Save, then Preview/Raw
+   into the ⋯ menu; then size, then time). response.js measures the overflow and sets .collapsed,
+   because the room needed depends on the content (label vs. select, Preview/Raw or not, counts). */
+.response-head .collapsed { display: none; }
 
 .editor-text, .output {
   flex: 1;
@@ -467,8 +462,9 @@ body.resizing { cursor: col-resize; user-select: none; }
 .segmented button + button { border-left: 1px solid var(--border); }
 .segmented button.active { background: var(--bg-selected); color: var(--text); }
 
-/* Shrinks and ellipsizes before anything else in the pane header; the full text stays in its title. */
-.pill { font: 500 11px var(--mono); white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 0; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; }
+/* The only element of the pane header that shrinks: it ellipsizes down to "200 OK" width (the full
+   text stays in its title); below that the header overflows and response.js collapses controls. */
+.pill { font: 500 11px var(--mono); white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 40px; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; }
 .pill:empty { display: none; }
 .pill.pending { color: var(--muted); }
 .meta { color: var(--muted); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }

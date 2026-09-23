@@ -578,8 +578,12 @@ function ok(name, condition, detail) {
     menu: pairs.map(([, b]) => b).filter((id) => !document.getElementById(id).hidden),
     menuBtn: document.getElementById('resMenuBtn').checkVisibility(),
   }), PAIRS);
-  // Each action is offered exactly once; the menu follows the pane's ResizeObserver, so wait for it.
-  const settleActions = () => settle((pairs) => pairs.every(([a, b]) => document.getElementById(a).checkVisibility() === document.getElementById(b).hidden), PAIRS);
+  // Each action is offered exactly once and the header fits; the fit follows the pane's ResizeObserver
+  // (next frame), so wait for it rather than reading the state left by the previous size.
+  const settleActions = () => settle((pairs) => {
+    const head = document.getElementById('resTabs');
+    return head.scrollWidth <= head.clientWidth && pairs.every(([a, b]) => document.getElementById(a).checkVisibility() === document.getElementById(b).hidden);
+  }, PAIRS);
   // Visible controls of a pane header that stick out of the pane (the header clips what overflows).
   const clipped = (paneId, headId) => page.evaluate(([paneId, headId]) => {
     const pane = document.getElementById(paneId).getBoundingClientRect();
@@ -624,21 +628,31 @@ function ok(name, condition, detail) {
     await settleActions();
     const a = await bodyActions();
     check(`${w}×${h}: each body action offered once, ⋯ only when something is collapsed`, [a.inline.length + a.menu.length, a.menuBtn], [3, a.menu.length > 0]);
+    // Time stays at every reference size; size down to 380 px (at 320 px it goes when the text is wide).
+    check(`${w}×${h}: time${w > 320 ? ' and size' : ''} shown`, await page.evaluate(() => [document.getElementById('resTime').checkVisibility(), document.getElementById('resSize').checkVisibility()]), [true, w > 320 ? true : await page.isVisible('#resSize')]);
     check(`${w}×${h}: nothing clipped in the response header`, await clipped('resPane', 'resTabs'), []);
     if (mode !== 'wide') await page.click('#viewTabs button[data-view=request]');
     check(`${w}×${h}: nothing clipped in the request header`, await clipped('reqPane', 'reqTabs'), []);
     check(`${w}×${h}: Bulk edit inside the request pane`, await page.evaluate(() => document.getElementById('bulkBtn').checkVisibility()), true);
   }
 
-  // Wide bottom dock: everything inline, no ⋯. Narrow side dock: everything in the ⋯, nothing inline.
+  // Collapse order as the pane narrows: Copy/Save first, then Preview/Raw (both into the ⋯), then size,
+  // then time. Medium (475 px pane): everything inline, no ⋯. Bottom dock (438 px): Copy/Save in the ⋯,
+  // Preview/Raw still inline. Narrow side dock: all three in the ⋯, nothing inline, time and size kept.
+  await resize(680, 280);
+  await page.click('#viewTabs button[data-view=response]');
+  await settleActions();
+  check('680×280: Preview/Raw, Copy and Save inline, no ⋯ menu', await bodyActions(), { inline: ['resMode', 'resCopy', 'resSave'], menu: [], menuBtn: false });
+  check('680×280: Copy and Save are labelled icon buttons', await page.evaluate(() => ['resCopy', 'resSave'].map((id) => [document.getElementById(id).getAttribute('aria-label'), document.getElementById(id).title])), [['Copy body', 'Copy the response body'], ['Save body as file', 'Save the response body as a file']]);
+  await page.click('#viewTabs button[data-view=request]');
   await resize(1024, 320);
   await settleActions();
-  check('1024×320: Preview/Raw, Copy and Save inline, no ⋯ menu', await bodyActions(), { inline: ['resMode', 'resCopy', 'resSave'], menu: [], menuBtn: false });
-  check('1024×320: Copy and Save are labelled icon buttons', await page.evaluate(() => ['resCopy', 'resSave'].map((id) => [document.getElementById(id).getAttribute('aria-label'), document.getElementById(id).title])), [['Copy body', 'Copy the response body'], ['Save body as file', 'Save the response body as a file']]);
+  check('1024×320: Copy/Save collapse before Preview/Raw', await bodyActions(), { inline: ['resMode'], menu: ['copyResBtn', 'saveResBtn'], menuBtn: true });
   await resize(320, 260);
   await page.click('#viewTabs button[data-view=response]');
   await settleActions();
   check('320×260: all body actions in the ⋯ menu, none inline', await bodyActions(), { inline: [], menu: ['resModeItem', 'copyResBtn', 'saveResBtn'], menuBtn: true });
+  check('320×260: time still shown', await page.evaluate(() => document.getElementById('resTime').checkVisibility()), true);
   await page.click('#resMenuBtn');
   check('320×260: the open ⋯ menu shows exactly the collapsed actions', await page.evaluate(() => [...document.querySelectorAll('#resMenu [role=menuitem]')].filter((b) => b.checkVisibility()).map((b) => b.textContent)), ['Show preview', 'Copy body', 'Save body as file…']);
   await page.keyboard.press('Escape');
@@ -728,6 +742,9 @@ function ok(name, condition, detail) {
   check('Sent selected after the send', await page.inputValue('#resSource'), 'sent');
   // Recorded and sent both exist now: the selector replaces the label and offers both sources.
   check('source selector with both options once both exist', await page.evaluate(() => [document.getElementById('resSource').checkVisibility(), document.getElementById('resSourceLabel').checkVisibility(), [...document.getElementById('resSource').options].map((o) => [o.value, o.disabled])]), [true, false, [['recorded', false], ['sent', false]]]);
+  // The widest combination at the narrowest size: select, status and time fit next to the ⋯ (size goes).
+  await settleActions();
+  check('320×260 with the selector: time shown, nothing clipped', [await page.evaluate(() => document.getElementById('resTime').checkVisibility()), await clipped('resPane', 'resTabs')], [true, []]);
   includes('sent body', await page.textContent('#resBody'), '"url": "/layout?x=1&keep=kept"');
   await page.click('#resTabs button[data-tab=resHeaders]');
   const sentHeaders = await page.textContent('#resHeaders');
