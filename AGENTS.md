@@ -61,8 +61,10 @@ Module graph (top to bottom, acyclic): `main` → `actions` → `editor` / `send
 `CONTRIBUTING.md` is the source of truth for branching, commits, the definition of done and
 releases. For agents, in addition:
 
-- Issue first: any behaviour change needs an issue (open one if none exists, then branch as
-  `<type>/<topic>` from `main`); typos and docs-only fixes need none.
+- Issue first: any behaviour change needs an issue, bug fixes included (open one if none
+  exists, then branch as `<type>/<topic>` from `main`); typos and docs-only fixes need none.
+  This is stricter than `CONTRIBUTING.md` on purpose: agents work unattended, and the issue is
+  the human-readable trail of what was changed and why.
 - Follow the definition of done, open a PR and request an independent review (a second agent
   or a human) before merge. Never merge your own PR unreviewed.
 - Ask a human before: adding manifest `permissions` or `host_permissions`; changing the

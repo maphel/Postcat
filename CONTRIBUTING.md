@@ -22,15 +22,20 @@ and reopen DevTools.
 
 `main` is always releasable and protected: changes land only through pull requests, the CI
 `check` workflow must pass, and PRs are squash-merged (the PR title becomes the commit summary,
-so it follows the commit convention below). Branch from `main` as `<type>/<topic>`, e.g.
-`fix/curl-quoted-body` or `docs/shortcut-table`, with one of the types `feat`, `fix`, `docs`,
-`test`, `chore`, `refactor`. Open an issue first for anything beyond a bug fix or a docs change,
-so we can agree on the scope.
+so it follows the commit convention below). The protection cannot stop the repository owner
+(admin bypass, no required approvals), so "protected" and "no self-merge" bind the maintainer by
+convention, not by GitHub. Branch from `main` as `<type>/<topic>`, e.g. `fix/curl-quoted-body`
+or `docs/shortcut-table`, with one of the types `feat`, `fix`, `docs`, `test`, `chore`,
+`refactor`, `release` (the last one is used by the release script only). Open an issue first
+for anything beyond a bug fix or a docs change, so we can agree on the scope.
 
 ## Commits
 
 [Conventional Commits](https://www.conventionalcommits.org/): `type(scope)?: summary`, same
 types as the branches. The summary is imperative and short; the body explains why, not what.
+Squash merges on GitHub take the PR title as the commit summary and leave the commit body blank,
+so the PR title must follow this convention and the PR description is the place for the why;
+the individual commits on a branch are yours to shape as you like.
 
 ```
 fix(curl): keep single quotes inside --data bodies
@@ -57,10 +62,10 @@ The pull request template repeats this list as a checklist.
 ## Versioning
 
 SemVer, currently in the 0.x phase: a **minor** version for new user-visible features, a
-**patch** version for fixes and docs-only releases. 1.0 comes when the saved-collection storage
-format (`chrome.storage.local`, see `src/panel/storage.js`) is declared stable. `manifest.json`,
-`package.json` and `package-lock.json` always carry the same version; `scripts/pack.js` refuses
-to build otherwise.
+**patch** version for fixes. 1.0 comes when the saved-collection storage format
+(`chrome.storage.local`, see `src/panel/storage.js`) is declared stable. `manifest.json`,
+`package.json` and `package-lock.json` always carry the same version (the release script bumps
+all three); `scripts/pack.js` refuses to build when `manifest.json` and `package.json` differ.
 
 ## Releasing
 
@@ -81,9 +86,12 @@ section as release notes.
    and open the PR. Before opening the PR, load the unpacked extension and replay one GET and
    one POST on a real site (`AGENTS.md` § Verification). The release PR is reviewed and
    squash-merged like any other.
-2. On `main` after the merge (`git switch main && git pull`): `npm run release tag` creates the
-   annotated tag `v<version>` for the version now in `package.json` and prints
-   `git push origin v<version>`. Pushing the tag starts `.github/workflows/release.yml`, which
+2. On `main` right after the merge (`git switch main && git pull`), before other PRs land:
+   `npm run release tag` creates the annotated tag `v<version>` for the version now in
+   `package.json` and prints `git push origin v<version>`. The script refuses unless `HEAD` is
+   the squashed `release: v<version>` commit and `## Unreleased` is still empty, so a tag never
+   ships changes that are not in the changelog; if `main` has moved on, prepare a new release
+   instead. Pushing the tag starts `.github/workflows/release.yml`, which
    checks that the tag matches the version, runs lint, unit and e2e tests, packs the zip and
    publishes the GitHub release with the changelog section (`npm run changelog:section
    <version>`) as notes.
