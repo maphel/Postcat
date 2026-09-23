@@ -1,3 +1,5 @@
+<img src="docs/brand/postcat-icon.png" alt="Postcat: a cat with an arrow-shaped smile" width="96" height="96">
+
 # Postcat
 
 [![check](https://github.com/maphel/Postcat/actions/workflows/check.yml/badge.svg)](https://github.com/maphel/Postcat/actions/workflows/check.yml)

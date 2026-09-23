@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- Replace the app icon with a cat and arrow-shaped smile, and add it to the README.
+
 ## 0.1.0 — 2026-09-23
 
 First public release.
