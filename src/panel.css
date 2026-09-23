@@ -230,9 +230,16 @@ body.resizing { cursor: col-resize; user-select: none; }
   flex-shrink: 0;
 }
 .list-filter { min-height: 32px; gap: 4px; }
-.collection { font-size: 12px; font-weight: 500; color: var(--text); padding-left: 3px; max-width: 140px; min-width: 0; }
+/* Captured / Saved tabs: underline tabs like the other tab lists, sitting on the toolbar's border.
+   In the 214 px sidebar they share the row with the record and New buttons; when the row overflows
+   (a narrower sidebar, big counts) list.js drops the counts, the labels always stay. */
+.list-tools { padding-top: 0; padding-bottom: 0; }
+.list-tools.no-counts .count { display: none; }
+.collection { display: flex; align-items: stretch; gap: 8px; }
+.collection > [role=tab] { align-self: stretch; min-height: 34px; font-weight: 500; }
+.collection > [role=tab] .count { font-weight: 400; }
 .app[data-layout=narrow] .toolbar { padding-left: 9px; padding-right: 9px; }
-.app[data-layout=narrow] .collection { max-width: none; }
+.app[data-layout=narrow] .collection > [role=tab] { font-size: 12px; }
 .new .new-label { display: none; }
 .app[data-layout=narrow] .new { width: auto; padding: 3px 8px; }
 .app[data-layout=narrow] .new .new-label { display: inline; }
@@ -376,7 +383,7 @@ body.resizing { cursor: col-resize; user-select: none; }
   overflow: hidden;
 }
 .tabgroup { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-.switcher > [role=tab], .pane-head [role=tab] {
+.switcher > [role=tab], .pane-head [role=tab], .collection > [role=tab] {
   min-height: 30px;
   padding: 4px 0;
   border: 0;
@@ -387,8 +394,8 @@ body.resizing { cursor: col-resize; user-select: none; }
   gap: 4px;
 }
 .switcher > [role=tab] { font-size: 12px; }
-.switcher > [role=tab]:hover, .pane-head [role=tab]:hover { background: transparent; color: var(--text); }
-.switcher > [role=tab][aria-selected=true], .pane-head [role=tab][aria-selected=true] { border-bottom-color: var(--accent); color: var(--text); }
+.switcher > [role=tab]:hover, .pane-head [role=tab]:hover, .collection > [role=tab]:hover { background: transparent; color: var(--text); }
+.switcher > [role=tab][aria-selected=true], .pane-head [role=tab][aria-selected=true], .collection > [role=tab][aria-selected=true] { border-bottom-color: var(--accent); color: var(--text); }
 .pane-head .flush { margin-right: -4px; }
 .response-head { gap: 6px; }
 .response-head .tabgroup { margin-right: 2px; }

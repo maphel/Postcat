@@ -129,7 +129,8 @@ function bindResizer(handle, onMove, onReset) {
 export function initLayout() {
   bindResizer(
     $('sidebarResizer'),
-    (e) => { state.layout.sidebarW = Math.round(clamp(e.clientX, 160, window.innerWidth * 0.45)); },
+    // 180 px keeps the Captured / Saved labels, the record and the New button on one row.
+    (e) => { state.layout.sidebarW = Math.round(clamp(e.clientX, 180, window.innerWidth * 0.45)); },
     () => { state.layout.sidebarW = DEFAULT_LAYOUT.sidebarW; },
   );
   bindResizer(

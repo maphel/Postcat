@@ -160,7 +160,7 @@ export function tryParseCurl(text) {
 
 export function switchTab(tab) {
   state.tab = tab;
-  $('collection').value = tab;
+  for (const b of $('collection').querySelectorAll('[role=tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   renderList();
   persistSettings();
 }

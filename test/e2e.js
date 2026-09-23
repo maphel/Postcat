@@ -197,8 +197,21 @@ function ok(name, condition, detail) {
   check('name autosaved', (await stored('postcat.saved', (s) => s?.[0]?.name === 'My call'))?.[0]?.name, 'My call');
 
   // ---------- panel: keyboard navigation, reset, params and headers tables, cURL paste, delete ----------
-  await page.selectOption('#collection', 'captured');
-  await page.fill('#filterInput', '');
+  // Captured / Saved are direct tabs with counts: Save switched to Saved, one click switches back,
+  // Left/Right move between them when focused. No dropdown anywhere in the list toolbar.
+  const collectionTabs = () => page.evaluate(() => [...document.querySelectorAll('#collection [role=tab]')].map((b) => [b.dataset.tab, b.getAttribute('aria-selected'), b.querySelector('.count').textContent, b.checkVisibility()]));
+  await page.fill('#filterInput', ''); // the /POST/ filter would hide one captured row
+  check('Save switches to the Saved tab (with counts)', await collectionTabs(), [['captured', 'false', '2', true], ['saved', 'true', '1', true]]);
+  check('no dropdown in the list toolbar', await page.evaluate(() => [document.getElementById('collection').getAttribute('role'), document.querySelector('#listTools select')]), ['tablist', null]);
+  await page.click('#collectionCaptured');
+  await listHas(2, 'Captured tab');
+  check('Captured tab selected', (await collectionTabs()).map((t) => t[1]), ['true', 'false']);
+  await page.focus('#collectionCaptured');
+  await page.keyboard.press('ArrowRight');
+  await listHas(1, 'ArrowRight opens Saved');
+  check('ArrowRight moves to the Saved tab', [await page.evaluate(() => document.activeElement.id), (await collectionTabs()).map((t) => t[1])], ['collectionSaved', ['false', 'true']]);
+  await page.keyboard.press('ArrowLeft');
+  await listHas(2, 'ArrowLeft back to Captured');
   await page.evaluate(() => document.activeElement.blur());
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
@@ -283,7 +296,7 @@ function ok(name, condition, detail) {
   await viaMenu('#captureBtn', '#importBtn');
   await page.evaluate(() => { window.__navigated = true; });
   await page.fill('#filterInput', 'imported');
-  await page.selectOption('#collection', 'captured');
+  await page.click('#collectionCaptured');
   await listHas(1, 'imported');
   await page.locator('#requestList li[data-id]').first().click();
   await page.click('#resTabs button[data-tab=resBody]');
@@ -314,7 +327,7 @@ function ok(name, condition, detail) {
     __emit(media('/media/failed', { mime: '', status: 0, error: 'net::ERR_FAILED' }));
     __emit(media('/media/redirect', { mime: '', status: 302, resHeaders: [{ name: 'location', value: '/media/img.png' }] }));
   }, PNG_1x1);
-  await page.selectOption('#collection', 'captured');
+  await page.click('#collectionCaptured');
   await page.fill('#filterInput', '/media/');
   await listHas(8, 'media filter');
   const pick = async (path) => {
@@ -370,7 +383,7 @@ function ok(name, condition, detail) {
   await page.click('#reqTabs button[data-tab=body]');
   await page.fill('#body', '--x\r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n--x--');
   match('multipart warning', await page.textContent('#bodyStatus'), /^⚠ Multipart/);
-  await page.selectOption('#collection', 'captured');
+  await page.click('#collectionCaptured');
 
   // ---------- editor: info line, Enter to send, DevTools search, JSON validation, cancel, errors ----------
   match('info line on a captured request', await page.textContent('#info'), /^Captured( [^·]+)? · fetch · 5 ms$/);
@@ -462,7 +475,7 @@ function ok(name, condition, detail) {
   ok('queue not blocked by the abandoned send', Date.now() - t1 < 3000, `took ${Date.now() - t1} ms`);
 
   // Identical requests in the same millisecond are two entries; Import adds only what's missing.
-  await page.selectOption('#collection', 'captured');
+  await page.click('#collectionCaptured');
   await page.fill('#filterInput', '/twin');
   await page.evaluate(() => {
     const twin = () => harEntry({ started: 'twin-ms', time: 3, url: 'http://localhost:8765/twin', content: '{}' });
@@ -502,7 +515,7 @@ function ok(name, condition, detail) {
 
   // ---------- list: key repeat, scroll position, corrupt storage ----------
   // Holding Delete (key repeat) removes only one request.
-  await page.selectOption('#collection', 'captured');
+  await page.click('#collectionCaptured');
   await page.fill('#filterInput', '/bulk/');
   await listHas(999, 'bulk filter');
   await page.locator('#requestList li[data-id]').first().click();
@@ -550,7 +563,7 @@ function ok(name, condition, detail) {
   // headers, replayed later for Recorded / Sent. Its long status text must not push anything out of
   // the response header: the pill ellipsizes, the actions collapse into the ⋯ menu.
   await page.setViewportSize({ width: 1024, height: 320 });
-  await page.selectOption('#collection', 'captured');
+  await page.click('#collectionCaptured');
   await page.evaluate(() => __emit(harEntry({
     started: 'layout-1', time: 7, url: 'http://localhost:8765/layout?x=1', status: 500, statusText: 'Internal Server Error', mime: 'text/html',
     resHeaders: [{ name: 'content-type', value: 'text/html' }, { name: 'x-source', value: 'recorded' }], content: '<h1>recorded</h1>',
@@ -646,6 +659,8 @@ function ok(name, condition, detail) {
     if (mode !== 'wide') await page.click('#viewTabs button[data-view=request]');
     check(`${w}×${h}: nothing clipped in the request header`, await clipped('reqPane', 'reqTabs'), []);
     check(`${w}×${h}: Bulk edit inside the request pane`, await page.evaluate(() => document.getElementById('bulkBtn').checkVisibility()), true);
+    // The list toolbar (Captured / Saved tabs, record, New) fits wherever the list is shown.
+    if (mode !== 'narrow') check(`${w}×${h}: nothing clipped in the list toolbar`, await clipped('sidebar', 'listTools'), []);
   }
 
   // Collapse order as the pane narrows: Copy/Save first, then Preview/Raw (both into the ⋯), then size,
@@ -689,6 +704,23 @@ function ok(name, condition, detail) {
   await settle(() => document.getElementById('bulkBtn').querySelector('.label').checkVisibility());
   check('split reset restores the label', await page.evaluate(() => document.getElementById('bulkBtn').querySelector('.label').checkVisibility()), true);
 
+  // The sidebar at its minimum (180 px): both Captured / Saved labels stay, nothing clipped (the
+  // small counts here still fit; big ones drop, checked at the end).
+  const dragSidebar = async (toX) => {
+    const side = await page.locator('#sidebarResizer').boundingBox();
+    await page.mouse.move(side.x + 2, side.y + 100);
+    await page.mouse.down();
+    await page.mouse.move(toX, side.y + 100, { steps: 4 });
+    await page.mouse.up();
+    await settle(() => document.getElementById('sidebar').clientWidth === 180);
+  };
+  const listTools = async () => [...await page.evaluate(() => [document.getElementById('sidebar').clientWidth, document.getElementById('capturedCount').checkVisibility(), document.getElementById('collectionCaptured').checkVisibility(), document.getElementById('collectionSaved').checkVisibility()]), await clipped('sidebar', 'listTools')];
+  await dragSidebar(100);
+  check('minimum sidebar: both tabs stay, nothing clipped', await listTools(), [180, true, true, true, []]);
+  await page.dblclick('#sidebarResizer');
+  await settle(() => document.getElementById('sidebar').clientWidth === 214);
+  check('sidebar reset', (await listTools())[0], 214);
+
   // Drafts and the selection survive crossing both breakpoints while editing URL, param, header and body.
   await resize(1024, 320);
   await page.fill('#url', 'http://localhost:8765/layout?x=1&keep=me');
@@ -728,6 +760,7 @@ function ok(name, condition, detail) {
   await resize(320, 260);
   await page.click('#backBtn');
   check('Requests opens the list', await page.evaluate(() => [document.getElementById('app').dataset.screen, document.activeElement.classList.contains('selected')]), ['list', true]);
+  check('320×260: Captured and Saved tabs both visible, nothing clipped in the list toolbar', [await page.evaluate(() => ['collectionCaptured', 'collectionSaved'].map((id) => document.getElementById(id).checkVisibility())), await clipped('sidebar', 'listTools')], [[true, true], []]);
   await page.evaluate(() => { for (let i = 0; i < 40; i++) __emit(harEntry({ started: `rows-${i}`, url: `http://localhost:8765/rows/${i}`, content: '{}' })); });
   await listHas(41, 'long narrow list');
   check('long list scrolls inside the panel', (await shape()).listScrolls, true);
@@ -789,6 +822,18 @@ function ok(name, condition, detail) {
   await page.click('#captureBtn');
   await page.click('#appearance button[data-appearance=system]');
   check('system appearance follows DevTools', await page.evaluate(() => document.documentElement.classList.contains('dark')), true);
+
+  // Big counts: shown in the default sidebar; in the minimum one they drop rather than clip, the labels stay.
+  await page.evaluate(() => { for (let i = 0; i < 1000; i++) __emit(harEntry({ started: `many-${i}`, url: `http://localhost:8765/many/${i}`, mime: '' })); });
+  await page.click('#collectionCaptured');
+  await settle(() => document.getElementById('capturedCount').textContent === '1000');
+  check('four-digit count in the default sidebar', [await page.textContent('#capturedCount'), ...await listTools()], ['1000', 214, true, true, true, []]);
+  await dragSidebar(100);
+  await settle(() => !document.getElementById('capturedCount').checkVisibility());
+  check('minimum sidebar with big counts: counts drop, both tabs stay', await listTools(), [180, false, true, true, []]);
+  await page.dblclick('#sidebarResizer');
+  await settle(() => document.getElementById('capturedCount').checkVisibility());
+  check('sidebar reset restores the counts', await listTools(), [214, true, true, true, []]);
 
   if (process.env.SCREENSHOT) await page.screenshot({ path: process.env.SCREENSHOT });
   check('no uncaught panel errors', errors, []);

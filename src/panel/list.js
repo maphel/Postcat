@@ -21,10 +21,23 @@ export function renderList({ scroll = false } = {}) {
     scrollToSelected = false;
     // Rows are rebuilt, so keyboard focus inside the list would otherwise fall back to the body.
     if (hadFocus) (selected || list.querySelector('li[data-id]'))?.focus({ preventScroll: true });
-    $('collectionCaptured').textContent = state.captured.length ? `Captured · ${state.captured.length}` : 'Captured';
-    $('collectionSaved').textContent = state.saved.length ? `Saved · ${state.saved.length}` : 'Saved';
+    $('capturedCount').textContent = state.captured.length || '';
+    $('savedCount').textContent = state.saved.length || '';
     $('listCount').textContent = items.length || '';
+    fitListTools();
   });
+}
+
+// The Captured / Saved tabs share their row with the record and New buttons. When the row overflows
+// (a narrow sidebar, big counts), the counts go; both labels stay visible and clickable.
+function fitListTools() {
+  const tools = $('listTools');
+  tools.classList.remove('no-counts');
+  if (tools.scrollWidth > tools.clientWidth) tools.classList.add('no-counts');
+}
+
+export function initList() {
+  new ResizeObserver(fitListTools).observe($('sidebar'));
 }
 
 function emptyListItem() {

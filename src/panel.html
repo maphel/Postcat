@@ -23,11 +23,12 @@
 
 <div class="app" id="app" data-layout="wide" data-screen="detail" data-view="request">
   <aside class="sidebar" id="sidebar" aria-label="Request list">
-    <div class="toolbar list-tools">
-      <select id="collection" class="quiet collection" aria-label="Collection" title="Captured requests or your saved collection">
-        <option value="captured" id="collectionCaptured">Captured</option>
-        <option value="saved" id="collectionSaved">Saved</option>
-      </select>
+    <div class="toolbar list-tools" id="listTools">
+      <!-- Captured / Saved: both always visible, one click to switch (Left/Right when focused, main.js). -->
+      <span id="collection" class="collection" role="tablist" aria-label="Collection">
+        <button type="button" role="tab" id="collectionCaptured" data-tab="captured" aria-selected="true" title="Requests recorded from the page">Captured <span id="capturedCount" class="count"></span></button>
+        <button type="button" role="tab" id="collectionSaved" data-tab="saved" aria-selected="false" title="Your saved collection">Saved <span id="savedCount" class="count"></span></button>
+      </span>
       <span class="push"></span>
       <button id="recordBtn" class="icon record" type="button" aria-pressed="true" aria-label="Pause recording" title="Pause recording"><span class="dot"></span></button>
       <button id="newListBtn" class="icon new" type="button" aria-label="New request" title="New empty request"><svg><use href="#i-plus"/></svg><span class="new-label">New</span></button>

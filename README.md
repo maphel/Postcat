@@ -34,11 +34,12 @@ After updating the code, reload the extension on `chrome://extensions`, then clo
 
 ## Usage
 
-**Recording** is on by default (the dot next to the collection selector pauses it). The options
+**Recording** is on by default (the dot next to the Captured / Saved tabs pauses it). The options
 menu (filter icon) holds the **XHR / Fetch only** switch (turn it off to record images, fonts and
 documents), **Import DevTools log**, **Clear captured** and the **Appearance** setting (Light,
 Dark or System, which follows DevTools' theme). The **filter** matches `METHOD url` as
-plain text or `/regex/`. The selector above the list switches between **Captured** and **Saved**.
+plain text or `/regex/`. The **Captured** and **Saved** tabs above the list (with their counts)
+switch the collection with one click.
 
 **Editing** a captured request marks it with ● in the list; **Reset to recorded** (in the ⋯ menu
 next to Send, together with Duplicate, Copy as cURL and Delete) restores the recorded version.

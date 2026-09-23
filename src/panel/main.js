@@ -3,7 +3,7 @@ import { headersToText, textToRows, urlToParams, prettyBody } from '../lib/index
 import { state, current } from './state.js';
 import { loadStorage, persistSettings, flushPending } from './storage.js';
 import { $, toast, copyText, isTyping, initMenus } from './dom.js';
-import { renderList } from './list.js';
+import { renderList, initList } from './list.js';
 import { renderEditor, renderReqTab, afterEdit, paramsKv, headersKv } from './editor.js';
 import { renderResponse, renderResTab, setBodyMode, saveResponseBody, shownBodyText, initResponse } from './response.js';
 import { send, cancelSend, isSending } from './sending.js';
@@ -177,7 +177,10 @@ $('appearance').addEventListener('click', (e) => {
 });
 
 $('filterInput').addEventListener('input', (e) => setFilter(e.target.value));
-$('collection').addEventListener('change', (e) => switchTab(e.target.value));
+$('collection').addEventListener('click', (e) => {
+  const tab = e.target.closest('button[data-tab]')?.dataset.tab;
+  if (tab) switchTab(tab);
+});
 
 $('requestList').addEventListener('click', (e) => {
   const li = e.target.closest('li[data-id]');
@@ -272,6 +275,7 @@ loadStorage().then(() => {
   for (const entry of buffered) addCaptured(entry);
   applyXhrOnly();
   initLayout();
+  initList();
   initResponse();
   setRecording(true);
   setFilter(state.filterText);
