@@ -1,4 +1,5 @@
-// Fake chrome.devtools for the e2e harness (test/e2e.js). Entries are pushed via window.__emit(harEntry).
+// Fake chrome.devtools for the harness page (test/harness.js) used by test/e2e.js and scripts/screenshot.js.
+// Entries are pushed via window.__emit(harEntry).
 window.__listeners = [];
 chrome.devtools = {
   panels: { themeName: 'dark' },

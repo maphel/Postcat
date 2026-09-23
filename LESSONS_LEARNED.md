@@ -31,7 +31,9 @@ Windows `cmd` quoting.
 **Root cause:** Header rule "set" replaces instead of merging; no scheme check; recorded
 `_error` / `Location` never read; no key-repeat guard; loose sniffing; short allow-list of
 curl flags; only POSIX quoting handled.
-**Fix:** See `test/regressions.test.js` and the "sprint 2" blocks in `test/e2e.js`.
+**Fix:** See `test/regressions.test.js` and the corresponding sections in `test/e2e.js` ("service
+worker: headers, cookies, redirects, body cap", "media and binary responses", "editor: … cancel,
+errors" and "list: key repeat, …").
 **Prevention:** Fuzz the send path and feed the panel real request shapes (failed, blocked,
 redirect, multipart, preflight) whenever capture or send code changes.
 

@@ -2,7 +2,7 @@
 // The panel runs in the harness page (test/harness.js) under a stubbed chrome.devtools.
 import http from 'node:http';
 import assert from 'node:assert';
-import { buildExtension, launch, openPanel, harEntry } from './harness.js';
+import { buildExtension, launch, openPanel, harEntry, waitForRows, waitForSendDone } from './harness.js';
 
 const PNG_1x1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 const MEDIA = {
@@ -133,14 +133,14 @@ function ok(name, condition, detail) {
   });
   // Waits (up to `timeout`) for a page-side condition; the check that follows reports the actual state.
   const settle = (fn, arg, timeout = 2000) => page.waitForFunction(fn, arg, { timeout }).catch(() => {});
-  // The list renders on the next animation frame: wait for the expected row count instead of sleeping.
+  // The list renders on the next animation frame: wait (up to `timeout`) for the expected row count
+  // instead of sleeping; the check that follows reports the actual count.
   const rows = () => page.locator('#requestList li[data-id]').count();
-  const listHas = async (n, what, timeout) => {
-    await settle((n) => document.querySelectorAll('#requestList li[data-id]').length === n, n, timeout);
+  const listHas = async (n, what, timeout = 2000) => {
+    await waitForRows(page, n, timeout).catch(() => {});
     check(`${what}: ${n} rows`, await rows(), n);
   };
-  const sendDone = () => page.waitForFunction(() => !document.getElementById('sendBtn').disabled
-    && /^\d/.test(document.getElementById('resStatus').textContent));
+  const sendDone = () => waitForSendDone(page);
   // chrome.storage writes are debounced (storage.js): waits until `key` holds a record `test`
   // accepts (page.waitForFunction can't await the async storage API), then returns what is there.
   const stored = async (key, test = () => true, timeout = 2000) => {

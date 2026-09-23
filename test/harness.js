@@ -1,6 +1,7 @@
 // Shared setup for test/e2e.js and scripts/screenshot.js: a throwaway copy of the extension whose
 // harness page runs the panel under the stubbed chrome.devtools (test/devtools-stub.js), a Playwright
-// launch that can load extensions, and a factory for the fake HAR entries the stub feeds the panel.
+// launch that can load extensions, a factory for the fake HAR entries the stub feeds the panel, and
+// the waits both scripts need (list rendered, send finished).
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -47,6 +48,18 @@ export async function openPanel(ctx, id, { width, height }) {
   await page.addInitScript(`window.harEntry = ${harEntry};`);
   await page.goto(`chrome-extension://${id}/src/harness.html`);
   return { page, errors };
+}
+
+// The list renders on the next animation frame (list.js): resolves once it shows exactly `n` rows.
+// Rejects after `timeout` ms (Playwright's default when omitted).
+export function waitForRows(page, n, timeout) {
+  return page.waitForFunction((n) => document.querySelectorAll('#requestList li[data-id]').length === n, n, { timeout });
+}
+
+// Resolves once a send has finished: the Send button is enabled again and the status line shows a code.
+export function waitForSendDone(page) {
+  return page.waitForFunction(() => !document.getElementById('sendBtn').disabled
+    && /^\d/.test(document.getElementById('resStatus').textContent));
 }
 
 // A fake chrome.devtools.network HAR entry. Every field has a plain default so a test names only what

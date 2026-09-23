@@ -9,18 +9,25 @@ dependencies. `README.md` describes the behaviour; this file describes the code.
 | Path | Role |
 |---|---|
 | `manifest.json` | MV3 manifest. Stays in the root so the unpacked extension's id (derived from the path) is stable |
+| `icons/` | Extension icons (16/32/48/128 px) referenced by the manifest |
 | `src/background.js` | Module service worker: replays requests (`postcat:send` / `postcat:cancel` messages), header rules via declarativeNetRequest |
-| `src/devtools.js` | Registers the panel; forwards DevTools' search bar to `window.postcatSearch` |
+| `src/devtools.html`, `src/devtools.js` | DevTools page (only loads the script); registers the panel and forwards DevTools' search bar to `window.postcatSearch` |
 | `src/panel.html`, `src/panel.css` | Panel markup and styles; colours only via custom properties in `:root` / `:root.dark` |
-| `src/panel/main.js` | Entry point: event wiring, shortcuts, boot |
+| `src/panel/main.js`, `actions.js` | Entry point: event wiring, shortcuts, boot; user actions that change the selection or which items exist |
 | `src/panel/state.js`, `storage.js` | Single `state` object and selectors; `chrome.storage.local` with validation and debounced writes |
 | `src/panel/capture.js`, `sending.js` | HAR entries → items (dedupe by occurrence, import); `send` / `cancelSend` / `abandonSend` |
 | `src/panel/list.js`, `editor.js`, `kv-editor.js` | Request list (rAF-batched), editor tabs, key/value table |
 | `src/panel/response.js`, `search.js`, `layout.js`, `dom.js` | Response rendering and previews, ⌘F search, resizers, DOM helpers |
 | `src/lib/` | Pure helpers (`headers`, `url`, `har`, `curl`, `json`, `body`, `format`; `index.js` re-exports). No DOM, no `chrome`. Shared by panel, worker and tests |
-| `test/` | `*.test.js` unit tests (`node:test`); `e2e.js` (Playwright, stubbed `chrome.devtools`); `real-devtools.js` (real Chrome + DevTools over CDP); `harness.js` builds and launches the extension for e2e and the screenshot script |
-| `scripts/pack.js`, `scripts/screenshot.js` | Zip for distribution; README screenshot |
-| `.github/workflows/` | `check.yml` runs `npm run check` on push/PR; `release.yml` attaches the zip to a `v*` tag release |
+| `test/*.test.js` | Unit tests (`node:test`): `lib.test.js` covers `src/lib`, `regressions.test.js` pins fixed bugs |
+| `test/e2e.js`, `test/real-devtools.js` | Playwright e2e against the stubbed `chrome.devtools`; real Chrome + DevTools over CDP |
+| `test/harness.js`, `test/devtools-stub.js` | Builds and launches the extension for e2e and the screenshot script, with shared waits (`waitForRows`, `waitForSendDone`); the fake `chrome.devtools` the harness page loads before the panel |
+| `scripts/pack.js`, `scripts/screenshot.js` | Zip for distribution; renders `docs/screenshot.png` (the README image) through the harness |
+| `.github/workflows/` | `check.yml` runs lint, unit, e2e and real-DevTools tests, then pack (the zip is uploaded as a workflow artifact) on push/PR; `release.yml` attaches the zip to a `v*` tag release |
+| `.github/ISSUE_TEMPLATE/`, `.github/dependabot.yml` | Bug report template and contact link for security reports; monthly grouped dependency updates (npm, actions) |
+| `package.json`, `eslint.config.js`, `.editorconfig`, `.gitignore` | Scripts and dev dependencies (`package-lock.json` pinned); lint rules; editor and ignore settings |
+| `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE` | User docs, release notes, contributor guide, security policy, MIT licence |
+| `AGENTS.md`, `CLAUDE.md`, `LESSONS_LEARNED.md` | This file (`CLAUDE.md` is a symlink to it); append-only incident log |
 
 Module graph (top to bottom, acyclic): `main` → `actions` → `editor` / `sending` / `capture` →
 `response` / `list` → `search` / `layout` / `storage` / `kv-editor` → `dom` / `state` / `lib`.

@@ -3,7 +3,7 @@
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs';
-import { buildExtension, launch, openPanel, harEntry } from '../test/harness.js';
+import { buildExtension, launch, openPanel, harEntry, waitForRows, waitForSendDone } from '../test/harness.js';
 
 const root = path.join(import.meta.dirname, '..');
 const out = path.join(root, 'docs', 'screenshot.png');
@@ -31,12 +31,11 @@ try {
     __emit(call('POST', 'http://localhost:8766/api/cats', 201, 142, '{"name":"Mittens","tags":["cat","indoor"]}'));
     __emit(call('GET', 'http://localhost:8766/api/cats?page=1&limit=20', 200, 83));
   });
-  // The list renders on the next animation frame.
-  await page.waitForFunction(() => document.querySelectorAll('#requestList li[data-id]').length === 4);
+  await waitForRows(page, 4);
   await page.locator('#requestList li[data-id]').first().click();
   await page.click('#reqTabs button[data-tab=headers]');
   await page.click('#sendBtn');
-  await page.waitForFunction(() => !document.getElementById('sendBtn').disabled && /^\d/.test(document.getElementById('resStatus').textContent));
+  await waitForSendDone(page);
   await page.mouse.move(0, 0);
   fs.mkdirSync(path.dirname(out), { recursive: true });
   await page.screenshot({ path: out });
