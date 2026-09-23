@@ -197,6 +197,20 @@ const READ_LIST = `(async () => {
     console.log('devtools search:', searchCount);
     assert.strictEqual(searchCount, '1 / 1');
 
+    // The version line in the Options menu, inside a real DevTools panel frame. The checkout under
+    // test is stamped or not (npm run stamp); the line settles asynchronously, so poll it in the page.
+    const stamped = fs.existsSync(path.join(EXT, 'src', 'build-info.js'));
+    const version = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8')).version;
+    const versionLine = await panel.evaluate(`new Promise((resolve) => {
+      const line = document.getElementById('versionLine');
+      const deadline = Date.now() + 2000;
+      const poll = () => (line.textContent.includes('·') || !${stamped} || Date.now() > deadline ? resolve(line.textContent) : setTimeout(poll, 25));
+      poll();
+    })`);
+    console.log('version line:', versionLine, stamped ? '(stamped)' : '(unstamped)');
+    assert.ok(versionLine.startsWith(`Postcat ${version}`), versionLine);
+    assert.strictEqual(versionLine.includes('·'), stamped, versionLine);
+
     panel.close();
     front.close();
     console.log('real devtools ok');
