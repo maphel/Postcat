@@ -3,14 +3,15 @@ import { headersToText, toCurl, parseCurl, compileFilter } from '../lib/index.js
 import { state, lists, current, visibleItems, copyOf, defaultName, nextId } from './state.js';
 import { persistSaved, persistSettings } from './storage.js';
 import { $, toast, copyText } from './dom.js';
-import { renderList } from './list.js';
+import { renderList, endRename } from './list.js';
 import { renderEditor } from './editor.js';
-import { clamp } from './layout.js';
+import { clamp, layoutMode, showScreen } from './layout.js';
 import { requestOf, abandonSend } from './sending.js';
 
 // `reveal` opens the detail screen in the narrow layout (a click on a row, a new request);
 // keyboard movement through the list keeps the current screen.
 export function select(id, { reveal = false } = {}) {
+  endRename(true);
   state.selectedId = id;
   if (reveal) state.screen = 'detail';
   renderEditor();
@@ -32,7 +33,18 @@ export async function save() {
   switchTab('saved');
   select(copy.id);
   toast('Saved to collection');
-  $('name').select();
+  if (layoutMode() !== 'narrow') rename(); // the name is edited in the list row; narrow keeps the details open
+}
+
+// Inline rename of the selected saved request: its list row shows an input (list.js). The narrow
+// layout opens the list screen for it.
+export function rename() {
+  const item = current();
+  if (!item || item.kind !== 'saved') return;
+  if (state.tab !== 'saved') switchTab('saved');
+  state.renaming = item.id;
+  if (layoutMode() === 'narrow') showScreen('list');
+  renderList({ scroll: true });
 }
 
 export async function duplicate() {

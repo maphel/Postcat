@@ -202,8 +202,6 @@ kbd {
 .app[data-layout=narrow] #sidebarResizer { display: none; }
 .app[data-layout=narrow][data-screen=list] > .main { display: none; }
 .app[data-layout=narrow][data-screen=detail] > .sidebar { display: none; }
-.narrow-only { display: none; }
-.app[data-layout=narrow] .narrow-only { display: inline-flex; }
 
 .resizer {
   cursor: col-resize;
@@ -318,14 +316,14 @@ body.resizing { cursor: col-resize; user-select: none; }
 
 .editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
-.context { display: flex; align-items: center; gap: 6px; padding: 2px 8px; min-height: 28px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.app[data-layout=narrow] .context { min-height: 32px; padding: 2px 6px; }
+/* The navigation row exists only in the narrow layout (the list and the details take turns). */
+.context { display: none; align-items: center; gap: 6px; padding: 2px 6px; min-height: 32px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.app[data-layout=narrow] .context { display: flex; }
 .context .back { padding-left: 2px; gap: 2px; }
-.context-name { flex: 1; min-width: 0; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#name { font-weight: 500; color: var(--text); border-color: transparent; background: none; padding-left: 4px; }
-#name:hover, #name:focus { border-color: var(--border); background: var(--bg-field); }
-.info { color: var(--muted); padding-left: 4px; }
-.info .edited-tag { color: var(--warn); }
+.context-name { flex: 1; min-width: 0; font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Inline rename of a saved request (state.renaming): its row's label is an input until Enter/blur commit or Escape cancels. */
+.list .rename { width: 100%; min-height: 20px; padding: 1px 4px; font-size: 11px; }
 
 .urlbar { display: flex; align-items: center; gap: 5px; padding: 5px 8px; min-height: 39px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .app[data-layout=narrow] .urlbar { padding: 5px 6px; gap: 4px; }

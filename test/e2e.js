@@ -183,6 +183,7 @@ function ok(name, condition, detail) {
   ok('JSON response highlighted', (await page.locator('#resBody .j-key').count()) > 0, 'no .j-key spans');
   check('edited marker on the row', await page.locator('#requestList li.selected .edited').count(), 1);
   check('Reset offered in the More menu', await inMenu('#moreBtn', '#resetBtn'), true);
+  check('Rename not offered for a captured request', await inMenu('#moreBtn', '#renameBtn'), false);
   check('header count', await page.textContent('#reqHeaderCount'), '2');
   // Recorded vs. sent response toggle.
   await page.selectOption('#resSource', 'recorded');
@@ -192,9 +193,34 @@ function ok(name, condition, detail) {
   await page.click('#saveBtn');
   check('saved to storage', (await stored('postcat.saved', (s) => s?.length === 1))?.length, 1);
   check('Save disabled for a saved item (autosave)', await page.isDisabled('#saveBtn'), true);
-  // Saved items autosave.
+  // Saved items autosave. The name is edited in the list row: Save opens the inline rename there.
+  await settle(() => document.activeElement?.id === 'name'); // rendered on the next frame
+  check('Save opens the inline rename in the list row', await page.evaluate(() => [document.activeElement.id, !!document.activeElement.closest('#requestList li.selected')]), ['name', true]);
   await page.fill('#name', 'My call');
+  await page.press('#name', 'Enter');
   check('name autosaved', (await stored('postcat.saved', (s) => s?.[0]?.name === 'My call'))?.[0]?.name, 'My call');
+  await settle(() => document.querySelector('#requestList li.selected .path')?.textContent === 'My call');
+  check('row shows the new name', await page.textContent('#requestList li.selected .path'), 'My call');
+  // F2 on the focused row renames too; Escape discards; a double-click opens it as well; the ⋯ menu offers Rename.
+  await page.focus('#requestList li.selected');
+  await page.keyboard.press('F2');
+  await settle(() => document.activeElement?.id === 'name');
+  await page.fill('#name', 'Renamed by F2');
+  await page.press('#name', 'Enter');
+  check('rename via F2 persists', (await stored('postcat.saved', (s) => s?.[0]?.name === 'Renamed by F2'))?.[0]?.name, 'Renamed by F2');
+  await page.focus('#requestList li.selected');
+  await page.keyboard.press('F2');
+  await settle(() => document.activeElement?.id === 'name');
+  await page.fill('#name', 'discarded');
+  await page.press('#name', 'Escape');
+  await settle(() => !document.getElementById('name'));
+  check('Escape discards the rename', [await page.textContent('#requestList li.selected .path'), (await stored('postcat.saved'))?.[0]?.name], ['Renamed by F2', 'Renamed by F2']);
+  await page.dblclick('#requestList li.selected');
+  await settle(() => document.activeElement?.id === 'name');
+  check('double-click opens the rename', await page.evaluate(() => document.activeElement.id), 'name');
+  await page.press('#name', 'Escape');
+  await settle(() => !document.getElementById('name'));
+  check('Rename offered in the ⋯ menu for a saved request', await inMenu('#moreBtn', '#renameBtn'), true);
 
   // ---------- panel: keyboard navigation, reset, params and headers tables, cURL paste, delete ----------
   // Captured / Saved are direct tabs with counts: Save switched to Saved, one click switches back,
@@ -386,7 +412,11 @@ function ok(name, condition, detail) {
   await page.click('#collectionCaptured');
 
   // ---------- editor: info line, Enter to send, DevTools search, JSON validation, cancel, errors ----------
-  match('info line on a captured request', await page.textContent('#info'), /^Captured( [^·]+)? · fetch · 5 ms$/);
+  // No context row: the capture details sit in the tooltips of the list row and the Recorded label.
+  await page.locator('#requestList li[data-id]').first().click(); // /media/redirect: captured, never sent
+  await settle(() => document.getElementById('resSourceLabel').checkVisibility());
+  match('captured metadata in the row tooltip', await page.getAttribute('#requestList li.selected', 'title'), /^GET http:\/\/localhost:8765\/media\/redirect\nCaptured( [^·\n]+)? · fetch · 5 ms$/);
+  match('captured metadata on the Recorded label', await page.getAttribute('#resSourceLabel', 'title'), /^Captured( [^·]+)? · fetch · 5 ms$/);
 
   // Enter in the URL field sends.
   await page.click('#newListBtn');
@@ -640,6 +670,7 @@ function ok(name, condition, detail) {
     check(`${w}×${h}: ${mode} layout`, s.layout, mode);
     check(`${w}×${h}: app root does not overflow`, s.overflow, [false, false]);
     check(`${w}×${h}: Send on screen`, s.send, true);
+    check(`${w}×${h}: context row ${mode === 'narrow' ? 'is the navigation row' : 'absent'}`, await page.evaluate(() => document.getElementById('context').checkVisibility()), mode === 'narrow');
     if (mode === 'wide') check(`${w}×${h}: list, request and response side by side`, [s.list, s.req, s.res, s.switcher], [true, true, true, false]);
     else if (mode === 'medium') check(`${w}×${h}: list plus one switched pane`, [s.list, s.switcher, s.req, s.res], [true, true, s.view === 'request', s.view === 'response']);
     else check(`${w}×${h}: details fill the width`, [s.screen, s.list, s.switcher, s.req || s.res], ['detail', false, true, true]);
@@ -768,6 +799,7 @@ function ok(name, condition, detail) {
   await page.locator('#requestList li[data-id]').last().click();
   match('selecting a row returns to the details', await page.inputValue('#url'), /\/layout\?x=1&keep=kept$/);
   check('draft kept after list → details', (await draft()).body, '{"kept": true}');
+  check('narrow row shows ‹ Requests and the path', await page.evaluate(() => [document.getElementById('backBtn').textContent.replace(/\s+/g, ' ').trim(), document.getElementById('contextName').textContent, document.getElementById('contextName').title]), ['Requests 41', '/layout?x=1&keep=kept', 'http://localhost:8765/layout?x=1&keep=kept']);
   await page.click('#backBtn');
   await page.keyboard.press('ArrowUp');
   await settle(() => document.activeElement?.title.startsWith('GET http://localhost:8765/rows/0')); // the list re-renders on the next frame

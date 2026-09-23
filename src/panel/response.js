@@ -1,5 +1,5 @@
 // The response pane: status line, headers, and the body as text, JSON, preview or hex dump.
-import { formatBytes, formatTime, describeBody, formatBody, tokenizeJson, hexDump, fileNameFor } from '../lib/index.js';
+import { formatBytes, formatTime, captureInfo, describeBody, formatBody, tokenizeJson, hexDump, fileNameFor } from '../lib/index.js';
 import { state, current, nextId } from './state.js';
 import { $, el, statusClass, toast } from './dom.js';
 import { refreshSearch } from './search.js';
@@ -31,14 +31,17 @@ export function renderResponse() {
   const hasSent = !!sent && !pending && !sent.cancelled;
   const canCompare = !!item.recorded && hasSent;
   const view = canCompare ? item.view || 'sent' : null;
+  // The capture details (time, type, duration) live in the tooltips of the Recorded label / select.
+  const captured = item.recorded ? captureInfo(item) : '';
   const source = $('resSource');
   source.hidden = !canCompare;
   if (canCompare) source.value = view;
+  source.title = `Recorded from the page (${captured}), or the response to your last send`;
   const label = $('resSourceLabel');
   const only = hasSent ? 'sent' : item.recorded && !pending && !sent?.cancelled ? 'recorded' : null;
   label.hidden = canCompare || !only;
   label.textContent = only === 'sent' ? 'Sent' : 'Recorded';
-  label.title = only === 'sent' ? 'The response to your last send' : 'Recorded from the page';
+  label.title = only === 'sent' ? 'The response to your last send' : captured;
 
   if (pending) {
     showResponse({ pending: true, placeholder: 'Sending…' });

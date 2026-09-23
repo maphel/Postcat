@@ -18,6 +18,7 @@ export const state = {
   screen: 'detail',       // narrow layout: list | detail
   detailView: 'request',  // medium/narrow layouts: request | response
   filterText: '',
+  renaming: null,       // id of the saved request whose name is being edited in its list row
   filter: null,
   captured: [],
   saved: [],

@@ -43,7 +43,10 @@ switch the collection with one click.
 
 **Editing** a captured request marks it with ● in the list; **Reset to recorded** (in the ⋯ menu
 next to Send, together with Duplicate, Copy as cURL and Delete) restores the recorded version.
-**Save** (bookmark icon) copies it into the collection, where changes are saved automatically.
+**Save** (bookmark icon) copies it into the collection, where changes are saved automatically;
+rename a saved request in the list (double-click its row, press F2, or pick **Rename** in the ⋯
+menu; Enter commits, Escape cancels). Hover a captured row, or the **Recorded** label in the
+response header, for when it was captured, its resource type and duration.
 The request tabs carry one action each: **Bulk edit** / **Table view** on Headers and
 **Beautify** on Body (icon only in a narrow pane).
 

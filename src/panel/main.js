@@ -4,14 +4,14 @@ import { state, current } from './state.js';
 import { loadStorage, persistSettings, flushPending } from './storage.js';
 import { $, toast, copyText, isTyping, initMenus } from './dom.js';
 import { renderList, initList } from './list.js';
-import { renderEditor, renderReqTab, afterEdit, paramsKv, headersKv } from './editor.js';
+import { renderEditor, renderReqTab, renderContextName, afterEdit, paramsKv, headersKv } from './editor.js';
 import { renderResponse, renderResTab, setBodyMode, saveResponseBody, shownBodyText, initResponse } from './response.js';
 import { send, cancelSend, isSending } from './sending.js';
 import { addCaptured, importEntries } from './capture.js';
 import { onSearch } from './search.js';
 import { initLayout, showScreen, setDetailView, setAppearance, layoutMode } from './layout.js';
 import {
-  select, save, duplicate, reset, moveSelection, remove, clearCaptured, copyCurl, newRequest,
+  select, save, duplicate, reset, rename, moveSelection, remove, clearCaptured, copyCurl, newRequest,
   tryParseCurl, switchTab, setFilter, setRecording,
 } from './actions.js';
 
@@ -53,7 +53,6 @@ const bindField = (id, field) => $(id).addEventListener('input', (e) => {
   item[field] = e.target.value;
   afterEdit(item);
 });
-bindField('name', 'name');
 bindField('headers', 'headersText');
 bindField('body', 'body');
 
@@ -103,6 +102,8 @@ $('dupBtn').addEventListener('click', duplicate);
 $('deleteBtn').addEventListener('click', remove);
 $('curlBtn').addEventListener('click', copyCurl);
 $('resetBtn').addEventListener('click', reset);
+$('renameBtn').addEventListener('click', rename);
+document.addEventListener('postcat:renamed', renderContextName); // list.js committed or cancelled a rename
 $('newBtn').addEventListener('click', () => newRequest());
 $('newListBtn').addEventListener('click', () => newRequest());
 $('newContextBtn').addEventListener('click', () => newRequest());
@@ -192,6 +193,10 @@ $('requestList').addEventListener('keydown', (e) => {
   e.preventDefault();
   select(Number(li.dataset.id), { reveal: true });
 });
+// Double-click on a saved row renames it in place (its clicks already selected it).
+$('requestList').addEventListener('dblclick', (e) => {
+  if (e.target.closest('li[data-id]') && current()?.kind === 'saved') rename();
+});
 
 // ---------- global ----------
 
@@ -220,6 +225,9 @@ document.addEventListener('keydown', (e) => {
   } else if (mod && e.key.toLowerCase() === 's') {
     e.preventDefault();
     save();
+  } else if (e.key === 'F2' && !inMenu(e.target)) {
+    e.preventDefault();
+    rename(); // saved requests only; the rename input itself keeps its keys (list.js)
   } else if (e.key === 'Escape' && isTyping(e.target)) {
     e.target.blur();
   } else if (!isTyping(e.target) && !inMenu(e.target) && !mod) {

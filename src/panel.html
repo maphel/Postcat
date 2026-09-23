@@ -78,14 +78,13 @@
     </div>
 
     <div id="editor" class="editor" hidden>
-      <!-- Context row: back to the list (narrow layout), request name or capture info, New + Save (narrow). -->
+      <!-- Narrow layout only: the way back to the list, the current name or path, New and Save (layout.js). -->
       <div class="context" id="context">
-        <button id="backBtn" class="back narrow-only" type="button" title="Back to the request list">
+        <button id="backBtn" class="back" type="button" title="Back to the request list">
           <svg><use href="#i-back"/></svg>Requests <span id="listCount" class="count"></span>
         </button>
-        <input id="name" class="context-name" placeholder="Request name" spellcheck="false" aria-label="Request name" title="Name in your collection">
-        <span id="info" class="info context-name"></span>
-        <button id="newContextBtn" class="icon narrow-only" type="button" aria-label="New request" title="New empty request"><svg><use href="#i-plus"/></svg></button>
+        <span id="contextName" class="context-name"></span>
+        <button id="newContextBtn" class="icon" type="button" aria-label="New request" title="New empty request"><svg><use href="#i-plus"/></svg></button>
       </div>
 
       <div class="urlbar" id="urlbar">
@@ -98,6 +97,7 @@
         <button id="moreBtn" class="icon" type="button" popovertarget="moreMenu" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" title="More actions"><svg><use href="#i-more"/></svg></button>
         <div id="moreMenu" class="menu" popover role="menu" aria-label="More actions">
           <button id="resetBtn" type="button" role="menuitem" title="Restore the request as it was recorded">Reset to recorded</button>
+          <button id="renameBtn" type="button" role="menuitem" title="Edit the name in the list (F2, or double-click the row)">Rename</button>
           <button id="dupBtn" type="button" role="menuitem" title="Duplicate this request">Duplicate</button>
           <button id="curlBtn" type="button" role="menuitem" title="Copy as a cURL command">Copy as cURL</button>
           <hr>

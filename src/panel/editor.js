@@ -1,8 +1,8 @@
-// The request editor: context row, URL bar, params/headers/body tabs, status line.
-import { parseHeaders, textToRows, rowsToText, urlToParams, paramsToUrl, formatTime, jsonError, expectsJson } from '../lib/index.js';
-import { state, current, isEdited, METHODS } from './state.js';
+// The request editor: the narrow navigation row, URL bar, params/headers/body tabs, status line.
+import { parseHeaders, textToRows, rowsToText, urlToParams, paramsToUrl, jsonError, expectsJson } from '../lib/index.js';
+import { state, current, isEdited, defaultName, METHODS } from './state.js';
 import { persistSavedSoon } from './storage.js';
-import { $, el } from './dom.js';
+import { $ } from './dom.js';
 import { createKvEditor } from './kv-editor.js';
 import { renderList } from './list.js';
 import { renderResponse } from './response.js';
@@ -53,11 +53,9 @@ export function renderEditor() {
   select.value = item.method;
   select.className = `m-${item.method.toLowerCase()}`;
   $('url').value = item.url;
+  renderContextName();
 
   const saved = item.kind === 'saved';
-  $('name').hidden = !saved;
-  $('name').value = item.name || '';
-  $('info').hidden = saved;
   // Saved items autosave: the bookmark stays (filled) so the row keeps its shape, but does nothing.
   const saveBtn = $('saveBtn');
   saveBtn.disabled = saved;
@@ -73,6 +71,25 @@ export function renderEditor() {
   renderReqTab();
   renderEditState();
   renderResponse();
+}
+
+// The narrow layout's navigation row: the saved name, or the path of a captured request (the
+// full URL in its title). Read-only; saved names are edited in the list row (list.js).
+export function renderContextName() {
+  const item = current();
+  if (!item) return;
+  const name = $('contextName');
+  name.textContent = item.kind === 'saved' ? item.name || defaultName(item) : pathOf(item.url);
+  name.title = item.url;
+}
+
+function pathOf(url) {
+  try {
+    const u = new URL(url);
+    return u.pathname + u.search;
+  } catch {
+    return url;
+  }
 }
 
 export function renderReqTab() {
@@ -103,19 +120,9 @@ function renderEditState() {
   renderBodyStatus(item);
   const edited = isEdited(item);
   $('resetBtn').hidden = !edited;
+  $('renameBtn').hidden = item.kind !== 'saved';
   $('viewEdited').hidden = !edited;
   $('method').className = `m-${item.method.toLowerCase()}`;
-
-  if (item.kind === 'captured') {
-    const info = $('info');
-    const date = new Date(item.startedDateTime);
-    const parts = [Number.isNaN(date.getTime()) ? 'Captured' : `Captured ${date.toLocaleTimeString()}`];
-    if (item.resourceType) parts.push(item.resourceType);
-    if (item.recorded?.time != null) parts.push(formatTime(item.recorded.time));
-    info.replaceChildren(parts.join(' · '));
-    if (edited) info.append(' · ', el('span', 'edited-tag', 'edited'));
-    info.title = info.textContent;
-  }
 }
 
 function renderBodyStatus(item) {

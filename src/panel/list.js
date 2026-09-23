@@ -1,6 +1,8 @@
-// The request list on the left: compact single-line rows (method, name or path, status).
-import { formatTime } from '../lib/index.js';
-import { state, lists, visibleItems, isEdited, latestResponse } from './state.js';
+// The request list on the left: compact single-line rows (method, name or path, status), and the
+// inline rename of a saved request's name.
+import { formatTime, captureInfo } from '../lib/index.js';
+import { state, lists, visibleItems, isEdited, latestResponse, defaultName } from './state.js';
+import { persistSavedSoon } from './storage.js';
 import { $, el, statusClass } from './dom.js';
 
 let frame = 0;
@@ -21,6 +23,11 @@ export function renderList({ scroll = false } = {}) {
     scrollToSelected = false;
     // Rows are rebuilt, so keyboard focus inside the list would otherwise fall back to the body.
     if (hadFocus) (selected || list.querySelector('li[data-id]'))?.focus({ preventScroll: true });
+    const renaming = list.querySelector('input.rename');
+    if (renaming) {
+      renaming.focus({ preventScroll: true });
+      renaming.select();
+    }
     $('capturedCount').textContent = state.captured.length || '';
     $('savedCount').textContent = state.saved.length || '';
     $('listCount').textContent = items.length || '';
@@ -66,14 +73,57 @@ function renderListItem(item) {
     path = u.pathname + u.search;
   } catch { /* keep raw url */ }
 
-  const main = el('span', 'path', item.kind === 'saved' ? item.name || path : path);
-  if (isEdited(item)) main.prepend(el('span', 'edited', '●'));
+  const main = el('span', 'path');
+  if (state.renaming === item.id) {
+    main.append(renameInput(item));
+  } else {
+    main.textContent = item.kind === 'saved' ? item.name || path : path;
+    if (isEdited(item)) main.prepend(el('span', 'edited', '●'));
+  }
 
   const res = latestResponse(item);
   const status = el('span', res ? `status ${statusClass(res.status)}` : 'status', res ? String(res.status || 'ERR') : '');
-  // The row truncates; the full value lives in the tooltip (host for saved rows, time, edited).
-  li.title = `${item.method} ${item.url}${res?.time != null ? `\n${formatTime(res.time)}` : ''}${isEdited(item) ? '\n(edited)' : ''}`;
+  // The row truncates; the tooltip has the full URL, the capture details (time, type, duration) or
+  // the time of the last response, and the edited state.
+  const detail = item.kind === 'captured' ? captureInfo(item) : res?.time != null ? formatTime(res.time) : '';
+  li.title = `${item.method} ${item.url}${detail ? `\n${detail}` : ''}${isEdited(item) ? '\n(edited)' : ''}`;
   li.setAttribute('aria-label', `${item.method} ${item.kind === 'saved' && item.name ? item.name : host + path}${res ? `, ${res.status || 'failed'}` : ''}`);
   li.append(el('span', `method m-${item.method.toLowerCase()}`, item.method), main, status);
   return li;
+}
+
+// ---------- inline rename (saved requests) ----------
+// `state.renaming` holds the id; the row renders an input (#name) instead of its label, so the
+// rAF-batched re-renders cannot lose it. Enter and blur commit, Escape cancels.
+
+function renameInput(item) {
+  const input = el('input', 'rename');
+  input.id = 'name';
+  input.value = item.name || '';
+  input.placeholder = defaultName(item);
+  input.spellcheck = false;
+  input.setAttribute('aria-label', 'Request name');
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation(); // the list's keys (Enter selects, Delete removes) and the shortcuts must not see it
+    if (e.key === 'Enter') endRename(true);
+    else if (e.key === 'Escape') endRename(false);
+  });
+  input.addEventListener('blur', () => endRename(true));
+  input.addEventListener('click', (e) => e.stopPropagation()); // a click in the input is not a row selection
+  return input;
+}
+
+// Ends the rename in progress, if any; `commit` stores the typed name (autosaved as any edit).
+export function endRename(commit) {
+  const id = state.renaming;
+  if (id == null) return;
+  state.renaming = null;
+  const item = state.saved.find((i) => i.id === id);
+  const input = $('name');
+  if (commit && item && input) {
+    item.name = input.value.trim();
+    persistSavedSoon();
+  }
+  renderList();
+  document.dispatchEvent(new CustomEvent('postcat:renamed')); // the narrow navigation row shows the name (editor.js)
 }

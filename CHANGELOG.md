@@ -10,7 +10,9 @@ All notable changes to Postcat are listed here. The format is based on
 ### Changed
 - Compact, docking-aware layout: the panel adapts to its width (list, editor and response side by
   side; list plus a Request / Response switcher; or list and details taking the full width with a
-  "Requests" button), Captured / Saved are direct tabs with counts above the list, the response
+  "Requests" button), Captured / Saved are direct tabs with counts above the list, there is no
+  context row above the URL bar (capture time, type and duration sit in the tooltips of the list
+  row and the Recorded label; saved requests are renamed inline in their list row), the response
   header has direct Body / Headers tabs, Preview / Raw, Copy and
   Save inline (a ⋯ menu takes over only what a narrow pane cannot fit), Recorded / Sent is a
   control only when both exist, the request tabs carry their own action (Bulk edit, Beautify),

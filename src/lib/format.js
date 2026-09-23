@@ -30,3 +30,13 @@ export function fetchErrorMessage(error, url, { cancelled = false, timedOut = fa
   }
   return message;
 }
+
+// One line about a captured request: when it was recorded, its resource type and duration.
+// Shown in tooltips (the list row, the Recorded label of the response header).
+export function captureInfo({ startedDateTime, resourceType, recorded } = {}) {
+  const date = new Date(startedDateTime);
+  const parts = [Number.isNaN(date.getTime()) ? 'Captured' : `Captured ${date.toLocaleTimeString()}`];
+  if (resourceType) parts.push(resourceType);
+  if (recorded?.time != null) parts.push(formatTime(recorded.time));
+  return parts.join(' · ');
+}
