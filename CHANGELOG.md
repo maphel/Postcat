@@ -7,6 +7,8 @@ All notable changes to Postcat are listed here. The format is based on
 
 <!-- Entries go under ### Added / ### Changed / ### Fixed / ### Removed; add only the subsections you need. -->
 
+## 0.2.0 — 2026-09-23
+
 ### Added
 - The options menu ends with the installed version (`Postcat 0.1.0`). On a checkout stamped with
   `npm run stamp` it also names the commit, branch and stamp time, so a reloaded unpacked

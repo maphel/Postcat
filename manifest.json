@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Postcat",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Capture network requests in DevTools, edit them and send them again — a tiny Postman.",
   "minimum_chrome_version": "116",
   "devtools_page": "src/devtools.html",
