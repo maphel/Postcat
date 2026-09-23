@@ -11,6 +11,8 @@
     "lint": "eslint .",
     "check": "npm run lint && npm test && npm run test:e2e && npm run test:real",
     "pack": "node scripts/pack.js",
+    "release": "node scripts/release.js",
+    "changelog:section": "node scripts/changelog-section.js",
     "screenshot": "node scripts/screenshot.js"
   },
   "devDependencies": {

@@ -91,12 +91,14 @@ npm run test:e2e    # extension in headless Chromium with a stubbed DevTools API
 npm run test:real   # real Chrome with real DevTools, driven over CDP
 npm run check       # all of the above
 npm run pack        # dist/postcat-<version>.zip
+npm run release <version>  # release branch: version bump + changelog; `npm run release tag` after the merge
 npm run screenshot  # docs/screenshot.png for this README
 ```
 
 `manifest.json` stays in the repository root so the unpacked extension keeps its id; the code
 lives in `src/` as ES modules (`src/panel/` UI, `src/lib/` pure helpers, `src/background.js`
-service worker). `AGENTS.md` has the file map and the rules that keep the replay path safe.
+service worker). `AGENTS.md` has the file map and the rules that keep the replay path safe;
+`CONTRIBUTING.md` describes branching, the definition of done for a PR and the release flow.
 
 ## Contributing
 
