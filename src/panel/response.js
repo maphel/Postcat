@@ -60,9 +60,11 @@ function showResponse({ status, statusText, time, size, headers, body, bodyBase6
   if (pending) {
     pill.textContent = '…';
     pill.className = 'pill pending';
+    pill.title = '';
   } else {
     pill.textContent = status == null ? '' : `${status || 'ERR'} ${statusText || ''}`.trim();
     pill.className = `pill ${status == null ? '' : statusClass(status)}`;
+    pill.title = pill.textContent; // the pill ellipsizes in narrow panes
   }
   $('resTime').textContent = formatTime(time);
   $('resSize').textContent = formatBytes(size);

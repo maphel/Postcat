@@ -201,6 +201,30 @@ function ok(name, condition, detail) {
   match('ArrowDown selects the next row', await page.inputValue('#url'), /\/users\?page=1$/);
   await page.keyboard.press('ArrowUp');
   match('ArrowUp selects the previous row', await page.inputValue('#url'), /\/users$/);
+
+  // Keys inside an open menu stay in the menu: arrows move between its items without touching the
+  // list selection, and Backspace on a focused item does not delete the request.
+  const frames = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); // the list renders on the next frame
+  const selectedId = () => page.evaluate(() => document.querySelector('#requestList li.selected')?.dataset.id);
+  await frames();
+  const selectedBeforeMenu = await selectedId();
+  const rowsBeforeMenu = await rows();
+  await page.focus('#moreBtn');
+  await page.keyboard.press('Enter');
+  await settle(() => document.activeElement?.id === 'resetBtn'); // the first item is focused on `toggle`
+  check('Enter on the ⋯ button opens its menu', await page.evaluate(() => [document.getElementById('moreBtn').getAttribute('aria-expanded'), document.activeElement.id]), ['true', 'resetBtn']);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  check('ArrowDown moves the focus within the menu', await page.evaluate(() => [document.activeElement.id, !!document.activeElement.closest('#moreMenu')]), ['curlBtn', true]);
+  await frames();
+  check('ArrowDown in a menu leaves the list selection alone', [await selectedId(), await page.inputValue('#url')], [selectedBeforeMenu, 'http://localhost:8765/users']);
+  await page.keyboard.press('Backspace');
+  await frames(); // a delete would have rendered by now
+  check('Backspace on a menu item deletes nothing', [await rows(), await selectedId()], [rowsBeforeMenu, selectedBeforeMenu]);
+  await page.keyboard.press('Escape');
+  check('Escape closes the menu', await page.getAttribute('#moreBtn', 'aria-expanded'), 'false');
+  check('menu triggers announce their menu', await page.evaluate(() => [...document.querySelectorAll('[popovertarget]')].map((b) => b.getAttribute('aria-haspopup'))), ['menu', 'menu', 'menu', 'menu']);
+
   await viaMenu('#moreBtn', '#resetBtn');
   await settle(() => !document.querySelector('#requestList li .edited'));
   check('Reset restores the body', await page.inputValue('#body'), '{"name":"cat"}');
@@ -516,14 +540,19 @@ function ok(name, condition, detail) {
 
   // ---------- layouts: wide / medium / narrow follow the panel width ----------
   // One captured request with a recorded response and distinctive headers, replayed later for Recorded / Sent.
+  // Its long status text must not push the source select or the ⋯ button out of the response header.
   await page.setViewportSize({ width: 1024, height: 320 });
   await page.selectOption('#collection', 'captured');
   await page.evaluate(() => __emit(harEntry({
-    started: 'layout-1', time: 7, url: 'http://localhost:8765/layout?x=1',
+    started: 'layout-1', time: 7, url: 'http://localhost:8765/layout?x=1', status: 500, statusText: 'Internal Server Error',
     resHeaders: [{ name: 'content-type', value: 'application/json' }, { name: 'x-source', value: 'recorded' }], content: '{"recorded":true}',
   })));
   await listHas(1, 'layout fixture');
   await page.locator('#requestList li[data-id]').first().click();
+  check('long status text in the pill and its title', [await page.textContent('#resStatus'), await page.getAttribute('#resStatus', 'title')], ['500 Internal Server Error', '500 Internal Server Error']);
+  // Both pane headers with their ⋯ buttons shown (the request ⋯ is hidden on Params; the response ⋯ needs the Body tab).
+  await page.click('#reqTabs button[data-tab=headers]');
+  await page.click('#resTabs button[data-tab=resBody]');
   const modeFor = (w) => (w >= 850 ? 'wide' : w >= 580 ? 'medium' : 'narrow');
   const resize = async (w, h) => {
     await page.setViewportSize({ width: w, height: h });
@@ -545,6 +574,16 @@ function ok(name, condition, detail) {
       listScrolls: document.getElementById('requestList').scrollHeight > document.getElementById('requestList').clientHeight,
     };
   });
+  // Whether each control is rendered and lies entirely inside the pane's box (a pane header clips
+  // what overflows, so a pushed-out control would be invisible but still have a rect outside the pane).
+  const fits = (paneId, selectors) => page.evaluate(([paneId, selectors]) => {
+    const pane = document.getElementById(paneId).getBoundingClientRect();
+    return selectors.map((sel) => {
+      const el = document.querySelector(sel);
+      const r = el.getBoundingClientRect();
+      return el.checkVisibility() && r.width > 0 && r.left >= pane.left - .5 && r.right <= pane.right + .5 && r.top >= pane.top - .5 && r.bottom <= pane.bottom + .5;
+    });
+  }, [paneId, selectors]);
   for (const [w, h] of [[1024, 320], [1024, 240], [850, 300], [680, 280], [580, 240], [380, 480], [320, 260]]) {
     await resize(w, h);
     const s = await shape();
@@ -555,6 +594,11 @@ function ok(name, condition, detail) {
     if (mode === 'wide') check(`${w}×${h}: list, request and response side by side`, [s.list, s.req, s.res, s.switcher], [true, true, true, false]);
     else if (mode === 'medium') check(`${w}×${h}: list plus one switched pane`, [s.list, s.switcher, s.req, s.res], [true, true, s.view === 'request', s.view === 'response']);
     else check(`${w}×${h}: details fill the width`, [s.screen, s.list, s.switcher, s.req || s.res], ['detail', false, true, true]);
+    // Only one pane is shown outside the wide layout: switch to each before measuring its header.
+    if (mode !== 'wide') await page.click('#viewTabs button[data-view=response]');
+    check(`${w}×${h}: status, source and ⋯ inside the response pane`, await fits('resPane', ['#resStatus', '#resSource', '#resMenuBtn']), [true, true, true]);
+    if (mode !== 'wide') await page.click('#viewTabs button[data-view=request]');
+    check(`${w}×${h}: tabs and ⋯ inside the request pane`, await fits('reqPane', ['#reqTabs [data-tab=body]', '#reqMenuBtn']), [true, true]);
   }
 
   // Drafts and the selection survive crossing both breakpoints while editing URL, param, header and body.

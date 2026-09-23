@@ -52,7 +52,8 @@ export function copyText(text, message) {
 // light dismiss, Escape and the top layer (so menus are never clipped by a pane); we add the
 // placement under the button, arrow-key navigation, and closing after an item was activated.
 
-const menuItems = (menu) => [...menu.querySelectorAll('button, input')].filter((n) => !n.hidden && !n.disabled && n.offsetParent !== null);
+// menuitem, menuitemcheckbox and menuitemradio, in DOM order.
+const menuItems = (menu) => [...menu.querySelectorAll('[role^=menuitem]')].filter((n) => !n.hidden && !n.disabled && n.offsetParent !== null);
 
 // Placed synchronously in `beforetoggle` (the popover has no size yet): anchored to the button's
 // right edge, below it, or above it when the space below is short. The Popover API keeps menus
@@ -77,6 +78,8 @@ function placeMenu(menu, button) {
 export function initMenus() {
   for (const menu of document.querySelectorAll('[popover][role=menu]')) {
     const button = document.querySelector(`[popovertarget="${menu.id}"]`);
+    button.setAttribute('aria-haspopup', 'menu');
+    button.setAttribute('aria-expanded', 'false');
     menu.addEventListener('beforetoggle', (e) => {
       const open = e.newState === 'open';
       button.setAttribute('aria-expanded', String(open));
@@ -88,13 +91,14 @@ export function initMenus() {
     menu.addEventListener('keydown', (e) => {
       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
       e.preventDefault();
+      e.stopPropagation(); // the document-level shortcuts (list navigation) must not see it
       const items = menuItems(menu);
       const idx = items.indexOf(document.activeElement);
       items[(idx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
     });
-    // Activating an item closes the menu; the checkbox change bubbles as a click on the input.
+    // Activating an item (including the checkbox and radio items) closes the menu.
     menu.addEventListener('click', (e) => {
-      if (e.target.closest('button, input')) menu.hidePopover();
+      if (e.target.closest('[role^=menuitem]')) menu.hidePopover();
     });
   }
 }

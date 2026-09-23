@@ -63,10 +63,10 @@ export function applyAppearance() {
   const devtoolsDark = chrome.devtools?.panels?.themeName === 'dark';
   const dark = state.appearance === 'dark' || (state.appearance === 'system' && devtoolsDark);
   document.documentElement.classList.toggle('dark', dark);
-  for (const b of $('appearance').querySelectorAll('button')) {
+  for (const b of $('appearance').querySelectorAll('button')) { // menuitemradio items
     const on = b.dataset.appearance === state.appearance;
     b.classList.toggle('active', on);
-    b.setAttribute('aria-pressed', String(on));
+    b.setAttribute('aria-checked', String(on));
   }
 }
 

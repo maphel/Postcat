@@ -178,8 +178,12 @@ kbd {
 }
 .menu > button.danger:hover:not(:disabled) { color: var(--err); }
 .menu hr { border: 0; height: 1px; background: var(--border); margin: 3px; }
-.menu-check { display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-size: 11px; border-radius: 4px; cursor: pointer; }
-.menu-check:hover { background: var(--bg-hover); }
+/* A menuitemcheckbox drawn as a checkbox: the box is a span, the tick shows when aria-checked. */
+.menu-check { gap: 8px; }
+.menu-check .check { display: inline-flex; width: 12px; height: 12px; flex-shrink: 0; border: 1px solid var(--border-strong); border-radius: 3px; background: var(--bg-field); }
+.menu-check .check svg { width: 10px; height: 10px; flex-basis: 10px; margin: auto; stroke-width: 2.5; visibility: hidden; }
+.menu-check[aria-checked=true] .check { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.menu-check[aria-checked=true] .check svg { visibility: visible; }
 .menu-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 8px; font-size: 11px; color: var(--muted); }
 
 /* ---------- app shell: three layouts, driven by data-layout on .app (layout.js) ---------- */
@@ -387,10 +391,10 @@ body.resizing { cursor: col-resize; user-select: none; }
 .pane-head .icon { margin-right: -4px; }
 .source { max-width: 96px; padding: 1px 4px; flex-shrink: 0; }
 
-/* Hide the least essential meta first when the pane gets narrow; the Preview/Raw switch moves into the ⋯ menu. */
+/* Hide the least essential meta first when the pane gets narrow; the Preview/Raw switch moves into the ⋯ menu.
+   The status pill (below) is the only element that shrinks, so the source select and the ⋯ button always stay in the pane. */
 @container (max-width: 470px) { #resSize { display: none; } #resMode { display: none; } }
 @container (max-width: 380px) { #resTime { display: none; } }
-@container (max-width: 300px) { .pill { max-width: 56px; overflow: hidden; text-overflow: ellipsis; } }
 
 .editor-text, .output {
   flex: 1;
@@ -444,7 +448,8 @@ body.resizing { cursor: col-resize; user-select: none; }
 .segmented button + button { border-left: 1px solid var(--border); }
 .segmented button.active { background: var(--bg-selected); color: var(--text); }
 
-.pill { font: 500 11px var(--mono); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Shrinks and ellipsizes before anything else in the pane header; the full text stays in its title. */
+.pill { font: 500 11px var(--mono); white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 0; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; }
 .pill:empty { display: none; }
 .pill.pending { color: var(--muted); }
 .meta { color: var(--muted); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }

@@ -13,6 +13,7 @@
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.2-4.2"/></symbol>
   <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
 </svg>
 
 <div class="app" id="app" data-layout="wide" data-screen="detail" data-view="request">
@@ -31,9 +32,9 @@
         <svg><use href="#i-search"/></svg>
         <input id="filterInput" type="search" placeholder="Filter requests" aria-label="Filter requests: text or /regex/" spellcheck="false">
       </label>
-      <button id="captureBtn" class="icon" type="button" popovertarget="captureMenu" aria-pressed="true" aria-label="Capture options" title="Capture options · XHR/Fetch only"><svg><use href="#i-filter"/></svg></button>
-      <div id="captureMenu" class="menu" popover role="menu" aria-label="Capture options">
-        <label class="menu-check" title="Record only XHR/fetch requests (no images, scripts, CSS)"><input type="checkbox" id="xhrOnly" checked> XHR / Fetch only</label>
+      <button id="captureBtn" class="icon" type="button" popovertarget="captureMenu" aria-haspopup="menu" aria-expanded="false" aria-pressed="true" aria-label="Options" title="Options · XHR/Fetch only"><svg><use href="#i-filter"/></svg></button>
+      <div id="captureMenu" class="menu" popover role="menu" aria-label="Options">
+        <button id="xhrOnly" class="menu-check" type="button" role="menuitemcheckbox" aria-checked="true" title="Record only XHR/fetch requests (no images, scripts, CSS)"><span class="check" aria-hidden="true"><svg><use href="#i-check"/></svg></span>XHR / Fetch only</button>
         <hr>
         <button id="importBtn" type="button" role="menuitem" title="Add everything DevTools logged before this panel was opened">Import DevTools log</button>
         <button id="clearBtn" type="button" role="menuitem" title="Remove all captured requests">Clear captured</button>
@@ -41,9 +42,9 @@
         <div class="menu-row">
           <span id="appearanceLabel">Appearance</span>
           <span id="appearance" class="segmented" role="group" aria-labelledby="appearanceLabel">
-            <button type="button" data-appearance="system" title="Follow DevTools’ theme">System</button>
-            <button type="button" data-appearance="light">Light</button>
-            <button type="button" data-appearance="dark">Dark</button>
+            <button type="button" role="menuitemradio" aria-checked="false" data-appearance="system" title="Follow DevTools’ theme">System</button>
+            <button type="button" role="menuitemradio" aria-checked="false" data-appearance="light">Light</button>
+            <button type="button" role="menuitemradio" aria-checked="false" data-appearance="dark">Dark</button>
           </span>
         </div>
       </div>
@@ -88,7 +89,7 @@
         </div>
         <button id="sendBtn" class="primary send" type="button" title="Send (Enter in the URL field, or ⌘/Ctrl + Enter)">Send</button>
         <button id="saveBtn" class="icon" type="button" aria-label="Save to collection" title="Save to collection (⌘/Ctrl + S)"><svg><use href="#i-bookmark"/></svg></button>
-        <button id="moreBtn" class="icon" type="button" popovertarget="moreMenu" aria-label="More actions" title="More actions"><svg><use href="#i-more"/></svg></button>
+        <button id="moreBtn" class="icon" type="button" popovertarget="moreMenu" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" title="More actions"><svg><use href="#i-more"/></svg></button>
         <div id="moreMenu" class="menu" popover role="menu" aria-label="More actions">
           <button id="resetBtn" type="button" role="menuitem" title="Restore the request as it was recorded">Reset to recorded</button>
           <button id="dupBtn" type="button" role="menuitem" title="Duplicate this request">Duplicate</button>
@@ -113,7 +114,7 @@
               <button type="button" role="tab" data-tab="body" aria-controls="body">Body <span id="reqBodyMark" class="dotmark"></span></button>
             </span>
             <span class="push"></span>
-            <button id="reqMenuBtn" class="icon" type="button" popovertarget="reqMenu" aria-label="Editor options" title="Editor options"><svg><use href="#i-more"/></svg></button>
+            <button id="reqMenuBtn" class="icon" type="button" popovertarget="reqMenu" aria-haspopup="menu" aria-expanded="false" aria-label="Editor options" title="Editor options"><svg><use href="#i-more"/></svg></button>
             <div id="reqMenu" class="menu" popover role="menu" aria-label="Editor options">
               <button id="bulkBtn" type="button" role="menuitem" title="Switch between table and plain text">Bulk edit</button>
               <button id="beautifyBtn" type="button" role="menuitem" title="Format the JSON body">Beautify JSON</button>
@@ -147,7 +148,7 @@
               <button type="button" data-mode="preview" title="Rendered preview">Preview</button>
               <button type="button" data-mode="raw" title="Source text or hex dump">Raw</button>
             </span>
-            <button id="resMenuBtn" class="icon" type="button" popovertarget="resMenu" aria-label="Response actions" title="Response actions"><svg><use href="#i-more"/></svg></button>
+            <button id="resMenuBtn" class="icon" type="button" popovertarget="resMenu" aria-haspopup="menu" aria-expanded="false" aria-label="Response actions" title="Response actions"><svg><use href="#i-more"/></svg></button>
             <div id="resMenu" class="menu" popover role="menu" aria-label="Response actions">
               <button id="resModeItem" type="button" role="menuitem">Show raw</button>
               <button id="copyResBtn" type="button" role="menuitem" title="Copy the response body">Copy body</button>

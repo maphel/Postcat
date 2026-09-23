@@ -156,10 +156,14 @@ $('importBtn').addEventListener('click', () => {
   });
 });
 
-$('xhrOnly').addEventListener('change', (e) => {
-  state.xhrOnly = e.target.checked;
+function applyXhrOnly() {
+  $('xhrOnly').setAttribute('aria-checked', String(state.xhrOnly));
   $('captureBtn').setAttribute('aria-pressed', String(state.xhrOnly));
-  $('captureBtn').title = state.xhrOnly ? 'Capture options · XHR/Fetch only' : 'Capture options · all request types';
+  $('captureBtn').title = state.xhrOnly ? 'Options · XHR/Fetch only' : 'Options · all request types';
+}
+$('xhrOnly').addEventListener('click', () => {
+  state.xhrOnly = !state.xhrOnly;
+  applyXhrOnly();
   persistSettings();
 });
 
@@ -177,10 +181,9 @@ $('requestList').addEventListener('click', (e) => {
 });
 $('requestList').addEventListener('keydown', (e) => {
   const li = e.target.closest('li[data-id]');
-  if (li && (e.key === 'Enter' || e.key === ' ')) {
-    e.preventDefault();
-    select(Number(li.dataset.id), { reveal: true });
-  }
+  if (!li || (e.key !== 'Enter' && e.key !== ' ') || e.metaKey || e.ctrlKey) return; // ⌘/Ctrl + Enter only sends
+  e.preventDefault();
+  select(Number(li.dataset.id), { reveal: true });
 });
 
 // ---------- global ----------
@@ -198,6 +201,10 @@ document.addEventListener('keydown', (e) => {
   next.click();
 });
 
+// Keys inside an open menu belong to the menu (dom.js): arrows never move the list selection,
+// `/` never leaves it for the filter, and Delete/Backspace on a focused item never delete the request.
+const inMenu = (target) => !!target.closest?.('[popover]');
+
 document.addEventListener('keydown', (e) => {
   const mod = e.metaKey || e.ctrlKey;
   if (mod && e.key === 'Enter') {
@@ -208,7 +215,7 @@ document.addEventListener('keydown', (e) => {
     save();
   } else if (e.key === 'Escape' && isTyping(e.target)) {
     e.target.blur();
-  } else if (!isTyping(e.target) && !mod) {
+  } else if (!isTyping(e.target) && !inMenu(e.target) && !mod) {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       moveSelection(e.key === 'ArrowDown' ? 1 : -1);
@@ -259,8 +266,7 @@ loadStorage().then(() => {
   const buffered = earlyEntries;
   earlyEntries = null;
   for (const entry of buffered) addCaptured(entry);
-  $('xhrOnly').checked = state.xhrOnly;
-  $('captureBtn').setAttribute('aria-pressed', String(state.xhrOnly));
+  applyXhrOnly();
   initLayout();
   setRecording(true);
   setFilter(state.filterText);
