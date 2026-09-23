@@ -59,6 +59,8 @@ const server = http.createServer((req, res) => {
   await new Promise((r) => server.listen(8765, r));
   const ctx = await chromium.launchPersistentContext('', {
     executablePath: process.env.CHROME || undefined,
+    // Playwright's default headless build ("headless shell") can't load extensions; "chromium" is the full browser.
+    channel: process.env.CHROME ? undefined : 'chromium',
     headless: true,
     args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`, '--headless=new'],
   });

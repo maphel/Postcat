@@ -8,7 +8,8 @@ import path from 'node:path';
 import assert from 'node:assert';
 import { chromium } from 'playwright';
 
-const CHROME = process.env.CHROME || chromium.executablePath();
+// The full Chromium (not the headless shell): extensions and DevTools need it.
+const CHROME = process.env.CHROME || chromium.executablePath('chromium');
 const EXT = path.join(import.meta.dirname, '..');
 const PORT = 8777;
 const CDP_PORT = 9333;
