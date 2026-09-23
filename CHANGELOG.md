@@ -7,6 +7,11 @@ All notable changes to Postcat are listed here. The format is based on
 
 <!-- Entries go under ### Added / ### Changed / ### Fixed / ### Removed; add only the subsections you need. -->
 
+### Added
+- The options menu ends with the installed version (`Postcat 0.1.0`). On a checkout stamped with
+  `npm run stamp` it also names the commit, branch and stamp time, so a reloaded unpacked
+  extension shows which code is running.
+
 ### Changed
 - Compact, docking-aware layout: the panel adapts to its width (list, editor and response side by
   side; list plus a Request / Response switcher; or list and details taking the full width with a

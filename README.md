@@ -37,7 +37,8 @@ After updating the code, reload the extension on `chrome://extensions`, then clo
 **Recording** is on by default (the dot next to the Captured / Saved tabs pauses it). The options
 menu (filter icon) holds the **XHR / Fetch only** switch (turn it off to record images, fonts and
 documents), **Import DevTools log**, **Clear captured** and the **Appearance** setting (Light,
-Dark or System, which follows DevTools' theme). The **filter** matches `METHOD url` as
+Dark or System, which follows DevTools' theme); its last line shows the installed version
+(`Postcat 0.1.0`). The **filter** matches `METHOD url` as
 plain text or `/regex/`. The **Captured** and **Saved** tabs above the list (with their counts)
 switch the collection with one click.
 
@@ -113,9 +114,15 @@ npm run test:e2e    # extension in headless Chromium with a stubbed DevTools API
 npm run test:real   # real Chrome with real DevTools, driven over CDP
 npm run check       # all of the above
 npm run pack        # dist/postcat-<version>.zip
+npm run stamp       # src/build-info.js (git-ignored): the panel's version line names the commit, branch and time
 npm run release <version>  # release branch: version bump + changelog; `npm run release tag` after the merge
 npm run screenshot  # docs/screenshot.png for this README
 ```
+
+When testing a branch as an unpacked extension, `npm run stamp` before reloading it turns the
+version line in the options menu into `Postcat 0.1.0 · e176965 · feat/foo · 19:42` (hover for the
+full commit), so you can tell whether the reload picked up the new code. The stamp never ships:
+`npm run pack` leaves `src/build-info.js` out of the zip.
 
 `manifest.json` stays in the repository root so the unpacked extension keeps its id; the code
 lives in `src/` as ES modules (`src/panel/` UI, `src/lib/` pure helpers, `src/background.js`
