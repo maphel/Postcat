@@ -230,8 +230,8 @@ function renderContent(model, url) {
     b.classList.toggle('active', b.dataset.mode === mode);
     b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
   }
-  $('resModeItem').textContent = mode === 'raw' ? 'Show preview' : 'Show raw';
-  $('resModeItem').dataset.mode = mode === 'raw' ? 'preview' : 'raw';
+  $('resPreviewItem').setAttribute('aria-checked', String(mode === 'preview'));
+  $('resRawItem').setAttribute('aria-checked', String(mode === 'raw'));
   if (mode === 'preview') renderPreview(model, url);
   else renderRaw(model);
 }
@@ -379,10 +379,10 @@ function escapeAttr(s) {
 // the content (Recorded/Sent as label or select, Preview/Raw or not, header counts). Runs on every
 // render and, through the ResizeObserver below, on every pane resize.
 const ACTIONS = [
-  // [inline control, menu item, applies?]
-  ['resMode', 'resModeItem', () => !!shown && PREVIEWABLE.has(shown.model.kind)],
-  ['resCopy', 'copyResBtn', () => shownText != null],
-  ['resSave', 'saveResBtn', () => !!shown],
+  // [inline control, its menu items, applies?]
+  ['resMode', ['resPreviewItem', 'resRawItem'], () => !!shown && PREVIEWABLE.has(shown.model.kind)],
+  ['resCopy', ['copyResBtn'], () => shownText != null],
+  ['resSave', ['saveResBtn'], () => !!shown],
 ];
 const COLLAPSE = [['resCopy', 'resSave'], ['resMode'], ['resSize'], ['resTime']]; // first to go first
 function updateBodyActions() {
@@ -392,10 +392,10 @@ function updateBodyActions() {
   // each measurement.
   const syncMenu = () => {
     let collapsed = 0;
-    for (const [inlineId, itemId] of ACTIONS) {
+    for (const [inlineId, itemIds] of ACTIONS) {
       const inline = $(inlineId);
       const inMenu = !inline.hidden && inline.classList.contains('collapsed');
-      $(itemId).hidden = !inMenu;
+      for (const itemId of itemIds) $(itemId).hidden = !inMenu;
       if (inMenu) collapsed++;
     }
     $('resMenuBtn').hidden = !collapsed;

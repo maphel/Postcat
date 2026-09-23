@@ -78,7 +78,11 @@ function renderListItem(item) {
     main.append(renameInput(item));
   } else {
     main.textContent = item.kind === 'saved' ? item.name || path : path;
-    if (isEdited(item)) main.prepend(el('span', 'edited', '●'));
+    if (isEdited(item)) { // the one edited indicator (the narrow switcher repeats it while the list is out of view)
+      const dot = el('span', 'edited', '●');
+      dot.title = 'Edited — Reset restores the recorded request';
+      main.prepend(dot);
+    }
   }
 
   const res = latestResponse(item);

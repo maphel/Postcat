@@ -2,7 +2,7 @@
 import { headersToText, textToRows, urlToParams, prettyBody } from '../lib/index.js';
 import { state, current } from './state.js';
 import { loadStorage, persistSettings, flushPending } from './storage.js';
-import { $, toast, copyText, isTyping, initMenus } from './dom.js';
+import { $, toast, copyText, isTyping, initMenus, openMenuAt } from './dom.js';
 import { renderList, initList } from './list.js';
 import { renderEditor, renderReqTab, renderContextName, afterEdit, paramsKv, headersKv } from './editor.js';
 import { renderResponse, renderResTab, setBodyMode, saveResponseBody, shownBodyText, initResponse } from './response.js';
@@ -135,7 +135,7 @@ $('resMode').addEventListener('click', (e) => {
   const mode = e.target.closest('button[data-mode]')?.dataset.mode;
   if (mode) setBodyMode(mode);
 });
-$('resModeItem').addEventListener('click', (e) => setBodyMode(e.currentTarget.dataset.mode));
+for (const id of ['resPreviewItem', 'resRawItem']) $(id).addEventListener('click', (e) => setBodyMode(e.currentTarget.dataset.mode));
 
 // Copy and Save: inline icon buttons, or the ⋯ menu's items when the pane is too narrow for them.
 const copyResponse = () => {
@@ -196,6 +196,18 @@ $('requestList').addEventListener('keydown', (e) => {
 // Double-click on a saved row renames it in place (its clicks already selected it).
 $('requestList').addEventListener('dblclick', (e) => {
   if (e.target.closest('li[data-id]') && current()?.kind === 'saved') rename();
+});
+// Right-click on a row: the request menu (the same one as the ⋯ next to Send) at the pointer, for that row.
+$('requestList').addEventListener('contextmenu', (e) => {
+  const li = e.target.closest('li[data-id]');
+  if (!li) return;
+  e.preventDefault();
+  if (Number(li.dataset.id) !== state.selectedId) select(Number(li.dataset.id));
+  const open = () => openMenuAt($('moreMenu'), e.clientX, e.clientY);
+  // On macOS contextmenu fires on mousedown; a popover opened now would be light-dismissed by the
+  // pointerup that follows. Open once the button is released.
+  if (e.buttons & 2) document.addEventListener('pointerup', () => setTimeout(open, 0), { once: true });
+  else open();
 });
 
 // ---------- global ----------

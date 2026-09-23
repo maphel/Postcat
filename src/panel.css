@@ -363,6 +363,8 @@ body.resizing { cursor: col-resize; user-select: none; }
 
 .switcher { display: none; align-items: center; gap: 14px; padding: 0 10px; min-height: 30px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .app:not([data-layout=wide]) .switcher { display: flex; }
+/* The list row's ● is the edited indicator; the switcher repeats it only where the list is out of view. */
+.app[data-layout=medium] #viewEdited { display: none; }
 
 .split { display: grid; grid-template-columns: var(--req-w) 5px minmax(0, 1fr); flex: 1; min-height: 0; }
 .app:not([data-layout=wide]) .split { display: flex; flex-direction: column; }
@@ -400,8 +402,11 @@ body.resizing { cursor: col-resize; user-select: none; }
 .pane-head .flush { margin-right: -4px; }
 .response-head { gap: 6px; }
 .response-head .tabgroup { margin-right: 2px; }
-.source { max-width: 96px; padding: 1px 4px; flex-shrink: 0; }
-.source-label { color: var(--muted); font-size: 11px; flex-shrink: 0; }
+/* Recorded / Sent: the label and the select share one slot (same padding, content width), so
+   nothing moves when the select takes the label's place. */
+.source, .source-label { padding: 1px 4px; border: 1px solid transparent; font-size: 11px; flex-shrink: 0; }
+.source { width: auto; max-width: 120px; field-sizing: content; }
+.source-label { color: var(--muted); }
 #resSave { margin-left: -4px; }
 
 /* The request header's contextual action (Bulk edit / Table view, Beautify): text with an icon,

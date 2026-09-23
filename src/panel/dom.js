@@ -59,11 +59,12 @@ const menuItems = (menu) => [...menu.querySelectorAll('[role^=menuitem]')].filte
 // right edge, below it, or above it when the space below is short. The Popover API keeps menus
 // in the top layer, so no pane can clip them.
 const MENU_ESTIMATE = 160; // px; enough for the tallest/widest menu, only used to pick a side
-function placeMenu(menu, button) {
-  const r = button.getBoundingClientRect();
+// `point` ({ x, y }) places the menu at a pointer instead of under the button (right-click on a row).
+function placeMenu(menu, button, point) {
+  const r = point ? { left: point.x, right: point.x, top: point.y, bottom: point.y } : button.getBoundingClientRect();
   const st = menu.style;
   st.left = st.right = st.top = st.bottom = 'auto';
-  if (r.right >= MENU_ESTIMATE || r.right > window.innerWidth - r.left) st.right = `${Math.max(4, window.innerWidth - r.right)}px`;
+  if (point ? window.innerWidth - r.left < MENU_ESTIMATE : r.right >= MENU_ESTIMATE || r.right > window.innerWidth - r.left) st.right = `${Math.max(4, window.innerWidth - r.right)}px`;
   else st.left = `${Math.max(4, r.left)}px`;
   const below = window.innerHeight - r.bottom - 4;
   if (below >= MENU_ESTIMATE || below >= r.top) {
@@ -75,6 +76,14 @@ function placeMenu(menu, button) {
   }
 }
 
+let pointerAnchor = null; // set by openMenuAt() for the next open
+
+// Opens a menu at a pointer position (a context menu); everything else works as for its button.
+export function openMenuAt(menu, x, y) {
+  pointerAnchor = { x, y };
+  menu.showPopover();
+}
+
 export function initMenus() {
   for (const menu of document.querySelectorAll('[popover][role=menu]')) {
     const button = document.querySelector(`[popovertarget="${menu.id}"]`);
@@ -83,7 +92,8 @@ export function initMenus() {
     menu.addEventListener('beforetoggle', (e) => {
       const open = e.newState === 'open';
       button.setAttribute('aria-expanded', String(open));
-      if (open) placeMenu(menu, button);
+      if (open) placeMenu(menu, button, pointerAnchor);
+      pointerAnchor = null;
     });
     menu.addEventListener('toggle', (e) => {
       if (e.newState === 'open') menuItems(menu)[0]?.focus();

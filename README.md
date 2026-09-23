@@ -42,11 +42,12 @@ plain text or `/regex/`. The **Captured** and **Saved** tabs above the list (wit
 switch the collection with one click.
 
 **Editing** a captured request marks it with ● in the list; **Reset to recorded** (in the ⋯ menu
-next to Send, together with Duplicate, Copy as cURL and Delete) restores the recorded version.
-**Save** (bookmark icon) copies it into the collection, where changes are saved automatically;
-rename a saved request in the list (double-click its row, press F2, or pick **Rename** in the ⋯
-menu; Enter commits, Escape cancels). Hover a captured row, or the **Recorded** label in the
-response header, for when it was captured, its resource type and duration.
+next to Send, together with Duplicate, Copy as cURL and Delete; a right-click on a list row opens
+the same menu) restores the recorded version. **Save** (bookmark icon) copies it into the
+collection, where changes are saved automatically; rename a saved request in the list
+(double-click its row, press F2, pick **Rename** in the ⋯ or right-click menu, or use the
+**Rename** offered by the Save toast; Enter commits, Escape cancels). Hover a captured row, or the
+**Recorded** label in the response header, for when it was captured, its resource type and duration.
 The request tabs carry one action each: **Bulk edit** / **Table view** on Headers and
 **Beautify** on Body (icon only in a narrow pane).
 

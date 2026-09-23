@@ -193,9 +193,11 @@ function ok(name, condition, detail) {
   await page.click('#saveBtn');
   check('saved to storage', (await stored('postcat.saved', (s) => s?.length === 1))?.length, 1);
   check('Save disabled for a saved item (autosave)', await page.isDisabled('#saveBtn'), true);
-  // Saved items autosave. The name is edited in the list row: Save opens the inline rename there.
+  // Saved items autosave. The name is edited in the list row; the Save toast offers the rename.
+  check('Save toast offers Rename', [await page.textContent('#toastText'), await page.textContent('#toastAction')], ['Saved', 'Rename']);
+  await page.click('#toastAction');
   await settle(() => document.activeElement?.id === 'name'); // rendered on the next frame
-  check('Save opens the inline rename in the list row', await page.evaluate(() => [document.activeElement.id, !!document.activeElement.closest('#requestList li.selected')]), ['name', true]);
+  check('Rename from the toast opens the inline rename in the list row', await page.evaluate(() => [document.activeElement.id, !!document.activeElement.closest('#requestList li.selected')]), ['name', true]);
   await page.fill('#name', 'My call');
   await page.press('#name', 'Enter');
   check('name autosaved', (await stored('postcat.saved', (s) => s?.[0]?.name === 'My call'))?.[0]?.name, 'My call');
@@ -221,6 +223,12 @@ function ok(name, condition, detail) {
   await page.press('#name', 'Escape');
   await settle(() => !document.getElementById('name'));
   check('Rename offered in the ⋯ menu for a saved request', await inMenu('#moreBtn', '#renameBtn'), true);
+  // Right-click on a row: the same menu at the pointer, with Rename for a saved row; Escape closes it.
+  await page.click('#requestList li.selected', { button: 'right' });
+  await settle(() => document.getElementById('moreMenu').matches(':popover-open'));
+  check('right-click on a saved row opens the request menu with Rename', await page.evaluate(() => [document.getElementById('moreMenu').matches(':popover-open'), ['renameBtn', 'dupBtn', 'curlBtn', 'deleteBtn'].map((id) => document.getElementById(id).checkVisibility()), document.getElementById('moreBtn').getAttribute('aria-expanded')]), [true, [true, true, true, true], 'true']);
+  await page.keyboard.press('Escape');
+  check('Escape closes the row menu', await page.evaluate(() => [document.getElementById('moreMenu').matches(':popover-open'), document.getElementById('moreBtn').getAttribute('aria-expanded')]), [false, 'false']);
 
   // ---------- panel: keyboard navigation, reset, params and headers tables, cURL paste, delete ----------
   // Captured / Saved are direct tabs with counts: Save switched to Saved, one click switches back,
@@ -615,11 +623,14 @@ function ok(name, condition, detail) {
   await page.click('#resTabs button[data-tab=resBody]');
 
   // Body actions (Preview/Raw, Copy, Save): inline, or in the ⋯ menu when the pane is too narrow.
-  const PAIRS = [['resMode', 'resModeItem'], ['resCopy', 'copyResBtn'], ['resSave', 'saveResBtn']];
+  // Inline control → its menu items (Preview/Raw are two radio items in the menu).
+  const PAIRS = [['resMode', 'resPreviewItem'], ['resMode', 'resRawItem'], ['resCopy', 'copyResBtn'], ['resSave', 'saveResBtn']];
   const bodyActions = () => page.evaluate((pairs) => ({
-    inline: pairs.map(([a]) => a).filter((id) => document.getElementById(id).checkVisibility()),
+    inline: [...new Set(pairs.map(([a]) => a))].filter((id) => document.getElementById(id).checkVisibility()),
     menu: pairs.map(([, b]) => b).filter((id) => !document.getElementById(id).hidden),
     menuBtn: document.getElementById('resMenuBtn').checkVisibility(),
+    // Every action offered exactly once: inline or in the menu, never both, never neither.
+    once: pairs.every(([a, b]) => document.getElementById(a).checkVisibility() === document.getElementById(b).hidden),
   }), PAIRS);
   // Collapse order (Copy/Save, Preview/Raw, size, time): whatever is collapsed, everything before it is
   // collapsed too. Width-tolerant, so the checks hold with wider system fonts (CI on Linux) as well.
@@ -696,7 +707,7 @@ function ok(name, condition, detail) {
     if (mode !== 'wide') await page.click('#viewTabs button[data-view=response]');
     await settleActions();
     const a = await bodyActions();
-    check(`${w}×${h}: each body action offered once, ⋯ only when something is collapsed`, [a.inline.length + a.menu.length, a.menuBtn], [3, a.menu.length > 0]);
+    check(`${w}×${h}: each body action offered once, ⋯ only when something is collapsed`, [a.once, a.menuBtn], [true, a.menu.length > 0]);
     // Time and size stay wherever the pane leaves room beyond doubt (≥ 375 px: 68 px+ to spare with
     // macOS fonts); at the narrower panes only the order and the status are pinned, since wider
     // system fonts legitimately collapse more there.
@@ -718,8 +729,8 @@ function ok(name, condition, detail) {
   await resize(680, 280);
   await page.click('#viewTabs button[data-view=response]');
   await settleActions();
-  check('680×280: Preview/Raw, Copy and Save inline, no ⋯ menu', await bodyActions(), { inline: ['resMode', 'resCopy', 'resSave'], menu: [], menuBtn: false });
-  check('680×280: Copy and Save are labelled icon buttons', await page.evaluate(() => ['resCopy', 'resSave'].map((id) => [document.getElementById(id).getAttribute('aria-label'), document.getElementById(id).title])), [['Copy body', 'Copy the response body'], ['Save body as file', 'Save the response body as a file']]);
+  check('680×280: Preview/Raw, Copy and Save inline, no ⋯ menu', await bodyActions(), { inline: ['resMode', 'resCopy', 'resSave'], menu: [], menuBtn: false, once: true });
+  check('680×280: Copy and Save are labelled icon buttons', await page.evaluate(() => ['resCopy', 'resSave'].map((id) => [document.getElementById(id).getAttribute('aria-label'), document.getElementById(id).title])), [['Copy', 'Copy'], ['Save as file', 'Save as file…']]);
   await page.click('#viewTabs button[data-view=request]');
   await resize(1024, 320);
   await settleActions();
@@ -729,11 +740,17 @@ function ok(name, condition, detail) {
   await resize(320, 260);
   await page.click('#viewTabs button[data-view=response]');
   await settleActions();
-  check('320×260: all body actions in the ⋯ menu, none inline', await bodyActions(), { inline: [], menu: ['resModeItem', 'copyResBtn', 'saveResBtn'], menuBtn: true });
+  check('320×260: all body actions in the ⋯ menu, none inline', await bodyActions(), { inline: [], menu: ['resPreviewItem', 'resRawItem', 'copyResBtn', 'saveResBtn'], menuBtn: true, once: true });
   check('320×260: collapse order respected, status shown', [await collapseOrdered(), await pillShown()], [true, true]);
   await page.click('#resMenuBtn');
-  check('320×260: the open ⋯ menu shows exactly the collapsed actions', await page.evaluate(() => [...document.querySelectorAll('#resMenu [role=menuitem]')].filter((b) => b.checkVisibility()).map((b) => b.textContent)), ['Show preview', 'Copy body', 'Save body as file…']);
-  await page.keyboard.press('Escape');
+  check('320×260: the open ⋯ menu shows exactly the collapsed actions, worded like the inline controls', await page.evaluate(() => [...document.querySelectorAll('#resMenu [role^=menuitem]')].filter((b) => b.checkVisibility()).map((b) => b.textContent)), ['Preview', 'Raw', 'Copy', 'Save as file…']);
+  check('320×260: Preview / Raw are radio items with the current mode checked', await page.evaluate(() => ['resPreviewItem', 'resRawItem'].map((id) => [document.getElementById(id).getAttribute('role'), document.getElementById(id).getAttribute('aria-checked')])), [['menuitemradio', 'false'], ['menuitemradio', 'true']]);
+  await page.click('#resPreviewItem');
+  await settle(() => document.querySelector('#resPreview iframe'));
+  check('320×260: Preview from the menu switches the body view', await page.evaluate(() => [!!document.querySelector('#resPreview iframe'), document.getElementById('resPreviewItem').getAttribute('aria-checked')]), [true, 'true']);
+  await page.click('#resMenuBtn');
+  await page.click('#resRawItem');
+  await settle(() => !document.getElementById('resBody').hidden);
   await page.click('#viewTabs button[data-view=request]');
 
   // A narrow request pane (split dragged in the wide layout) keeps the action as an icon with its name in aria-label and title.
@@ -787,6 +804,8 @@ function ok(name, condition, detail) {
   }));
   const expectedDraft = { url: 'http://localhost:8765/layout?x=1&keep=kept', body: '{"kept": true}', header: 'X-Kept: yes', params: '2', selected: 1 };
   check('draft before resizing', await draft(), expectedDraft);
+  await settle(() => document.querySelector('#requestList li.selected .edited'));
+  check('edited captured request shows ● in its row (1024×320)', await page.evaluate(() => { const dot = document.querySelector('#requestList li.selected .edited'); return [!!dot && dot.checkVisibility(), dot?.title]; }), [true, 'Edited — Reset restores the recorded request']);
   await resize(680, 280);
   check('draft kept in the medium layout', await draft(), expectedDraft);
   await resize(380, 480);

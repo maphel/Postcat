@@ -32,8 +32,7 @@ export async function save() {
   await persistSaved();
   switchTab('saved');
   select(copy.id);
-  toast('Saved to collection');
-  if (layoutMode() !== 'narrow') rename(); // the name is edited in the list row; narrow keeps the details open
+  toast('Saved', { label: 'Rename', run: rename }); // the one place that teaches the rename gesture
 }
 
 // Inline rename of the selected saved request: its list row shows an input (list.js). The narrow
