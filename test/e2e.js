@@ -1,19 +1,8 @@
+// End-to-end test: the service worker's replay path and the panel UI, driven by Playwright.
+// The panel runs in the harness page (test/harness.js) under a stubbed chrome.devtools.
 import http from 'node:http';
-import path from 'node:path';
-import fs from 'node:fs';
-import os from 'node:os';
 import assert from 'node:assert';
-import { chromium } from 'playwright';
-
-// Copy the extension to a temp dir and add a harness page that loads the panel with a fake chrome.devtools.
-const root = path.join(import.meta.dirname, '..');
-const ext = fs.mkdtempSync(path.join(os.tmpdir(), 'postcat-e2e-'));
-fs.copyFileSync(path.join(root, 'manifest.json'), path.join(ext, 'manifest.json'));
-fs.cpSync(path.join(root, 'src'), path.join(ext, 'src'), { recursive: true });
-fs.cpSync(path.join(root, 'icons'), path.join(ext, 'icons'), { recursive: true });
-fs.copyFileSync(path.join(import.meta.dirname, 'devtools-stub.js'), path.join(ext, 'src', 'stub.js'));
-fs.writeFileSync(path.join(ext, 'src', 'harness.html'), fs.readFileSync(path.join(root, 'src', 'panel.html'), 'utf8')
-  .replace('<script type="module" src="panel/main.js"></script>', '<script src="stub.js"></script><script type="module" src="panel/main.js"></script>'));
+import { buildExtension, launch, openPanel, harEntry } from './harness.js';
 
 const PNG_1x1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 const MEDIA = {
@@ -55,21 +44,34 @@ const server = http.createServer((req, res) => {
   });
 });
 
+// Assertions fail immediately, naming the check and showing actual vs. expected, so later steps
+// (which build on this state) never run against a broken panel.
+let passed = 0;
+const pass = (name) => { passed++; console.log(`ok  ${name}`); };
+function check(name, actual, expected) {
+  assert.deepStrictEqual(actual, expected, `${name}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+  pass(name);
+}
+function match(name, actual, re) {
+  assert.match(String(actual), re, `${name}: ${JSON.stringify(actual)} does not match ${re}`);
+  pass(name);
+}
+function includes(name, actual, needle) {
+  assert.ok(String(actual).includes(needle), `${name}: ${JSON.stringify(actual)} does not include ${JSON.stringify(needle)}`);
+  pass(name);
+}
+function ok(name, condition, detail) {
+  assert.ok(condition, `${name}: ${detail}`);
+  pass(name);
+}
+
 (async () => {
   await new Promise((r) => server.listen(8765, r));
-  const ctx = await chromium.launchPersistentContext('', {
-    executablePath: process.env.CHROME || undefined,
-    // Playwright's default headless build ("headless shell") can't load extensions; "chromium" is the full browser.
-    channel: process.env.CHROME ? undefined : 'chromium',
-    headless: true,
-    args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`, '--headless=new'],
-  });
-  let [sw] = ctx.serviceWorkers();
-  if (!sw) sw = await ctx.waitForEvent('serviceworker');
-  const id = sw.url().split('/')[2];
+  const { dir, cleanup } = buildExtension();
+  const { ctx, sw, id } = await launch(dir);
 
-  const PNG = PNG_1x1;
-  // 1) Background send: forbidden headers via DNR, origin removed, body, cookies isolated.
+  // ---------- service worker: headers, cookies, redirects, body cap ----------
+  // Forbidden headers go through DNR, Origin is removed, the body is kept, the cookie jar is untouched.
   const r = await sw.evaluate(() => postcatSend({
     method: 'POST', url: 'http://localhost:8765/api?x=1',
     headers: [
@@ -81,18 +83,15 @@ const server = http.createServer((req, res) => {
     body: '{"a":1}',
   }));
   const echo = JSON.parse(r.body);
-  console.log('status', r.status, 'size', r.size);
-  console.log('echo headers', JSON.stringify(echo.headers));
-  const checks = {
-    cookie: echo.headers.cookie === 'session=abc',
-    ua: echo.headers['user-agent'] === 'Postcat-Test',
-    referer: echo.headers.referer === 'https://ref.test/',
-    custom: echo.headers['x-custom'] === 'yes',
-    noOrigin: !('origin' in echo.headers),
-    body: echo.body === '{"a":1}' && echo.method === 'POST',
-  };
-  // Sprint 2: merged duplicate cookies, credentials in the URL, non-http schemes, Accept-Encoding.
-  const sprint2 = await sw.evaluate(async () => {
+  check('Cookie header sent', echo.headers.cookie, 'session=abc');
+  check('User-Agent overridden', echo.headers['user-agent'], 'Postcat-Test');
+  check('Referer overridden', echo.headers.referer, 'https://ref.test/');
+  check('custom header sent', echo.headers['x-custom'], 'yes');
+  check('Origin removed', 'origin' in echo.headers, false);
+  check('method and body', [echo.method, echo.body], ['POST', '{"a":1}']);
+
+  // Merged duplicate cookies, credentials in the URL, non-http schemes, Accept-Encoding.
+  const sent = await sw.evaluate(async () => {
     const get = (url, headers = []) => postcatSend({ method: 'GET', url, headers, body: '' }).then((r) => JSON.parse(r.body).headers, (e) => ({ thrown: String(e.message) }));
     return {
       dup: await get('http://localhost:8765/dup', [{ name: 'Cookie', value: 'a=1' }, { name: 'Cookie', value: 'b=2' }]),
@@ -101,11 +100,12 @@ const server = http.createServer((req, res) => {
       enc: await get('http://localhost:8765/enc', [{ name: 'Accept-Encoding', value: 'identity' }]),
     };
   });
-  checks.mergedCookies = sprint2.dup.cookie === 'a=1; b=2';
-  checks.urlCredentials = sprint2.auth.authorization === `Basic ${btoa('user:p@ss')}`;
-  checks.httpOnly = /^Only http\(s\) URLs/.test(sprint2.file.thrown);
-  checks.acceptEncoding = sprint2.enc['accept-encoding'] === 'identity';
-  // Security review: body cap, and header rules scoped to the exact origin.
+  check('duplicate Cookie headers merged', sent.dup.cookie, 'a=1; b=2');
+  check('URL credentials become Authorization', sent.auth.authorization, `Basic ${btoa('user:p@ss')}`);
+  match('non-http URL rejected', sent.file.thrown, /^Only http\(s\) URLs/);
+  check('Accept-Encoding forwarded', sent.enc['accept-encoding'], 'identity');
+
+  // Body cap, and header rules scoped to the exact origin.
   const guard = await sw.evaluate(async () => {
     const cookie = [{ name: 'Cookie', value: 's=1' }];
     const huge = await postcatSend({ method: 'GET', url: 'http://localhost:8765/huge', headers: [], body: '' });
@@ -114,93 +114,99 @@ const server = http.createServer((req, res) => {
     return { huge: { tooLarge: huge.tooLarge, size: huge.size, body: huge.body, b64: huge.bodyBase64 },
       sub: JSON.parse(sub.body).headers.cookie, same: JSON.parse(same.body).headers.cookie };
   });
-  checks.bodyCap = guard.huge.tooLarge === true && guard.huge.body === null && guard.huge.b64 === null;
-  checks.subdomainRedirectNoCookie = guard.sub === undefined;
-  checks.sameOriginRedirectKeepsCookie = guard.same === 's=1';
-  const rules = await sw.evaluate(() => chrome.declarativeNetRequest.getSessionRules());
-  checks.rulesCleaned = rules.length === 0;
+  check('50 MB body cap', [guard.huge.tooLarge, guard.huge.body, guard.huge.b64], [true, null, null]);
+  check('cookie not sent after redirect to a subdomain', guard.sub, undefined);
+  check('cookie kept after same-origin redirect', guard.same, 's=1');
+  check('session rules removed', await sw.evaluate(() => chrome.declarativeNetRequest.getSessionRules()), []);
   // A second send without Cookie must not carry the old one or the Set-Cookie from the response.
   const r2 = await sw.evaluate(() => postcatSend({ method: 'GET', url: 'http://localhost:8765/b', headers: [], body: 'ignored' }));
-  checks.noCookieLeak = !('cookie' in JSON.parse(r2.body).headers);
-  console.log('SW checks', checks);
-  for (const [k, ok] of Object.entries(checks)) assert.ok(ok, `SW check failed: ${k}`);
+  check('no cookie leaks into the next send', 'cookie' in JSON.parse(r2.body).headers, false);
 
-  // 2) Panel UI via harness with fake devtools API.
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  await page.setViewportSize({ width: 1300, height: 600 });
-  await page.goto(`chrome-extension://${id}/src/harness.html`);
+  // ---------- panel: capture, filter, edit, send, save ----------
+  const { page, errors } = await openPanel(ctx, id, { width: 1300, height: 600 });
   await page.evaluate(() => {
-    const mk = (method, url, type, status, reqBody) => ({
-      startedDateTime: new Date().toISOString() + Math.random(), time: 42, _resourceType: type,
-      request: { method, url, headers: [{ name: ':method', value: method }, { name: 'accept', value: 'application/json' }, { name: 'cookie', value: 'sid=1' }], postData: reqBody ? { text: reqBody } : undefined },
-      response: { status, statusText: 'OK', headers: [{ name: 'content-type', value: 'application/json' }], content: { size: 20, mimeType: 'application/json' } },
-      getContent: (cb) => cb('{"recorded":true}', null),
-    });
-    __emit(mk('GET', 'http://localhost:8765/users?page=1', 'fetch', 200));
-    __emit(mk('POST', 'http://localhost:8765/users', 'xhr', 201, '{"name":"cat"}'));
-    __emit(mk('GET', 'http://localhost:8765/logo.png', 'image', 200));
+    const headers = (method) => [{ name: ':method', value: method }, { name: 'accept', value: 'application/json' }, { name: 'cookie', value: 'sid=1' }];
+    const json = { time: 42, resHeaders: [{ name: 'content-type', value: 'application/json' }], content: '{"recorded":true}' };
+    __emit(harEntry({ ...json, method: 'GET', url: 'http://localhost:8765/users?page=1', headers: headers('GET') }));
+    __emit(harEntry({ ...json, method: 'POST', url: 'http://localhost:8765/users', headers: headers('POST'), type: 'xhr', status: 201, body: '{"name":"cat"}' }));
+    __emit(harEntry({ ...json, method: 'GET', url: 'http://localhost:8765/logo.png', headers: headers('GET'), type: 'image' }));
   });
-  // The list renders on the next animation frame; poll instead of sleeping.
-  const listHas = (n) => page
-    .waitForFunction((n) => document.querySelectorAll('#requestList li[data-id]').length === n, n, { timeout: 2000 })
-    .then(() => true, () => false);
-  const listCount = await listHas(2);
+  // Waits (up to `timeout`) for a page-side condition; the check that follows reports the actual state.
+  const settle = (fn, arg, timeout = 2000) => page.waitForFunction(fn, arg, { timeout }).catch(() => {});
+  // The list renders on the next animation frame: wait for the expected row count instead of sleeping.
+  const rows = () => page.locator('#requestList li[data-id]').count();
+  const listHas = async (n, what, timeout) => {
+    await settle((n) => document.querySelectorAll('#requestList li[data-id]').length === n, n, timeout);
+    check(`${what}: ${n} rows`, await rows(), n);
+  };
+  const sendDone = () => page.waitForFunction(() => !document.getElementById('sendBtn').disabled
+    && /^\d/.test(document.getElementById('resStatus').textContent));
+  // chrome.storage writes are debounced (storage.js): waits until `key` holds a record `test`
+  // accepts (page.waitForFunction can't await the async storage API), then returns what is there.
+  const stored = async (key, test = () => true, timeout = 2000) => {
+    const deadline = Date.now() + timeout;
+    let value;
+    do {
+      value = await page.evaluate(async (key) => (await chrome.storage.local.get(key))[key], key);
+      if (test(value)) break;
+      await new Promise((r) => setTimeout(r, 25));
+    } while (Date.now() < deadline);
+    return value;
+  };
+
+  await listHas(2, 'XHR-only capture');
   await page.fill('#filterInput', '/POST/');
-  const filtered = await listHas(1);
+  await listHas(1, 'regex filter');
   await page.locator('#requestList li').first().click();
-  const recordedBody = await page.textContent('#resBody');
-  // Edit body and send
+  includes('recorded body shown', await page.textContent('#resBody'), '"recorded": true');
+  // Edit the body and send.
   await page.click('#reqTabs button[data-tab=body]');
   await page.fill('#body', '{"name":"edited"}');
   await page.click('#sendBtn');
-  const sendDone = () => page.waitForFunction(() => !document.getElementById('sendBtn').disabled
-    && /^\d/.test(document.getElementById('resStatus').textContent));
   await sendDone();
-  const sent = JSON.parse(await page.textContent('#resBody'));
-  const highlighted = await page.locator('#resBody .j-key').count();
-  const editedMarker = await page.locator('#requestList li.selected .edited').count();
-  const resetVisible = await page.isVisible('#resetBtn');
-  const headerCount = await page.textContent('#reqHeaderCount');
+  const replayed = JSON.parse(await page.textContent('#resBody'));
+  check('edited body sent', replayed.body, '{"name":"edited"}');
+  check('recorded cookie sent', replayed.headers.cookie, 'sid=1');
+  ok('JSON response highlighted', (await page.locator('#resBody .j-key').count()) > 0, 'no .j-key spans');
+  check('edited marker on the row', await page.locator('#requestList li.selected .edited').count(), 1);
+  check('Reset visible', await page.isVisible('#resetBtn'), true);
+  check('header count', await page.textContent('#reqHeaderCount'), '2');
   // Recorded vs. sent response toggle.
   await page.click('#resSource button[data-view=recorded]');
-  const recordedAgain = await page.textContent('#resBody');
+  includes('recorded view', await page.textContent('#resBody'), '"recorded": true');
   await page.click('#resSource button[data-view=sent]');
 
   await page.click('#saveBtn');
-  await page.waitForTimeout(100);
-  const stored = await page.evaluate(() => chrome.storage.local.get('postcat.saved'));
-  const saveHiddenForSaved = !(await page.isVisible('#saveBtn'));
-  // Saved items autosave (debounced).
+  check('saved to storage', (await stored('postcat.saved', (s) => s?.length === 1))?.length, 1);
+  check('Save hidden for a saved item', await page.isVisible('#saveBtn'), false);
+  // Saved items autosave.
   await page.fill('#name', 'My call');
-  await page.waitForTimeout(700);
-  const autosaved = await page.evaluate(() => chrome.storage.local.get('postcat.saved'));
+  check('name autosaved', (await stored('postcat.saved', (s) => s?.[0]?.name === 'My call'))?.[0]?.name, 'My call');
 
-  // Keyboard navigation over the captured list, then reset the edited request.
+  // ---------- panel: keyboard navigation, reset, params and headers tables, cURL paste, delete ----------
   await page.click('#listTabs button[data-tab=captured]');
   await page.fill('#filterInput', '');
   await page.evaluate(() => document.activeElement.blur());
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
-  const navDown = await page.inputValue('#url');
+  match('ArrowDown selects the next row', await page.inputValue('#url'), /\/users\?page=1$/);
   await page.keyboard.press('ArrowUp');
-  const navUp = await page.inputValue('#url');
+  match('ArrowUp selects the previous row', await page.inputValue('#url'), /\/users$/);
   await page.click('#resetBtn');
-  await page.waitForTimeout(50);
-  const bodyAfterReset = await page.inputValue('#body');
-  const markerAfterReset = await page.locator('#requestList li .edited').count();
+  await settle(() => !document.querySelector('#requestList li .edited'));
+  check('Reset restores the body', await page.inputValue('#body'), '{"name":"cat"}');
+  check('Reset clears the marker', await page.locator('#requestList li .edited').count(), 0);
 
-  // Params table edits the URL; headers table toggles lines.
+  // The params table edits the URL; the headers table toggles lines.
   await page.keyboard.press('ArrowDown'); // -> GET /users?page=1
   await page.click('#reqTabs button[data-tab=params]');
-  const paramCount = await page.textContent('#reqParamCount');
+  check('param count', await page.textContent('#reqParamCount'), '1');
   await page.locator('#paramsView .kv-row').last().locator('.kv-key').fill('limit');
   await page.locator('#paramsView .kv-row').nth(1).locator('.kv-value').fill('5');
-  const urlWithParam = await page.inputValue('#url');
+  match('params table edits the URL', await page.inputValue('#url'), /\/users\?page=1&limit=5$/);
   await page.click('#reqTabs button[data-tab=headers]');
   await page.locator('#headersView .kv-row').first().locator('input[type=checkbox]').uncheck();
-  const headerCountAfterToggle = await page.textContent('#reqHeaderCount');
+  check('disabled header not counted', await page.textContent('#reqHeaderCount'), '1');
 
   // Pasting a cURL command outside inputs creates a saved request.
   await page.evaluate(() => document.activeElement.blur());
@@ -209,83 +215,71 @@ const server = http.createServer((req, res) => {
     dt.setData('text/plain', "curl 'http://localhost:8765/from-curl' -H 'x-from: curl' --data-raw 'hi'");
     document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }));
   });
-  const curlUrl = await page.inputValue('#url');
-  const curlMethod = await page.inputValue('#method');
+  match('cURL URL imported', await page.inputValue('#url'), /\/from-curl$/);
+  check('cURL method imported', await page.inputValue('#method'), 'POST');
   await page.click('#sendBtn');
   await sendDone();
   const curlEcho = JSON.parse(await page.textContent('#resBody'));
+  check('cURL header sent', curlEcho.headers['x-from'], 'curl');
+  check('cURL body sent', curlEcho.body, 'hi');
 
-  // Delete with undo.
-  const savedBefore = await page.locator('#requestList li[data-id]').count();
+  // Delete with undo; the tab and editor tab reach storage.
+  check('saved list', await rows(), 2);
   await page.evaluate(() => document.activeElement.blur());
   await page.keyboard.press('Delete');
-  const deleted = await listHas(savedBefore - 1);
+  await listHas(1, 'after Delete');
   await page.click('#toastAction');
-  const undone = await listHas(savedBefore);
-  await page.waitForTimeout(400);
-  const settings = (await page.evaluate(() => chrome.storage.local.get('postcat.settings')))['postcat.settings'];
+  await listHas(2, 'after Undo');
+  const settings = await stored('postcat.settings', (s) => s?.tab === 'saved' && s?.reqTab === 'headers');
+  check('settings persisted', [settings?.tab, settings?.reqTab], ['saved', 'headers']);
 
-  // Import log: bodies must survive a navigation of the inspected page, after which the real
-  // DevTools getContent() returns nothing (verified against real Chrome).
+  // ---------- panel: recorded bodies survive a navigation of the inspected page ----------
+  // Real DevTools' getContent() returns nothing once the inspected page navigated (verified in
+  // test/real-devtools.js), so bodies must be fetched at capture time. The stub decides when it
+  // is called, not when it answers, so Import and the "navigation" need no sleep in between.
   await page.evaluate(() => {
     window.__navigated = false;
-    window.__har = [{
-      startedDateTime: 'imported-1', time: 12, _resourceType: 'fetch',
-      request: { method: 'GET', url: 'http://localhost:8765/imported', headers: [] },
-      response: { status: 200, statusText: 'OK', headers: [], content: { size: 17, mimeType: 'application/json' } },
-      getContent: (cb) => setTimeout(() => cb(window.__navigated ? null : '{"imported":true}', ''), 10),
-    }];
+    const entry = harEntry({ started: 'imported-1', time: 12, url: 'http://localhost:8765/imported' });
+    entry.getContent = (cb) => { const gone = window.__navigated; setTimeout(() => cb(gone ? null : '{"imported":true}', ''), 10); };
+    window.__har = [entry];
   });
   await page.click('#importBtn');
-  await page.waitForTimeout(50);
   await page.evaluate(() => { window.__navigated = true; });
   await page.fill('#filterInput', 'imported');
   await page.click('#listTabs button[data-tab=captured]');
-  await listHas(1);
+  await listHas(1, 'imported');
   await page.locator('#requestList li[data-id]').first().click();
   await page.click('#resTabs button[data-tab=resBody]');
-  const importedBody = await page.textContent('#resBody');
+  await settle(() => document.getElementById('resBody').textContent.includes('"imported": true'));
+  includes('imported body kept across navigation', await page.textContent('#resBody'), '"imported": true');
 
-  // ---------- media & binary responses ----------
+  // ---------- media and binary responses ----------
   // Replay path: binary comes back as base64, text as text.
   const media = await sw.evaluate(async () => {
     const get = (url) => postcatSend({ method: 'GET', url: `http://localhost:8765${url}`, headers: [], body: '' });
     const [png, octet, html, bin] = await Promise.all(['/media/img.png', '/media/octet', '/media/page.html', '/media/blob.bin'].map(get));
     return { png, octet, html, bin };
   });
-  const swMedia = media.png.body === null && media.png.bodyBase64 === PNG
-    && media.octet.bodyBase64 != null && media.html.body === '<h1>Hello page</h1>' && media.bin.bodyBase64 != null;
+  check('replayed PNG is base64 only', [media.png.body, media.png.bodyBase64], [null, PNG_1x1]);
+  ok('replayed octet-stream is base64', media.octet.bodyBase64 != null, 'bodyBase64 missing');
+  check('replayed HTML is text', media.html.body, '<h1>Hello page</h1>');
+  ok('replayed binary is base64', media.bin.bodyBase64 != null, 'bodyBase64 missing');
 
   // Recorded path: DevTools hands out base64 for binary content.
   await page.evaluate((png) => {
-    const mk = (path, mimeType, content, encoding) => ({
-      startedDateTime: `media-${path}`, time: 5, _resourceType: 'fetch',
-      request: { method: 'GET', url: `http://localhost:8765${path}`, headers: [] },
-      response: { status: 200, statusText: 'OK', headers: [], content: { size: 70, mimeType } },
-      getContent: (cb) => cb(content, encoding),
-    });
-    __emit(mk('/media/img.png', 'image/png', png, 'base64'));
-    __emit(mk('/media/clip.mp4', 'video/mp4', btoa('\0\0\0\x20ftypisom not really a video'), 'base64'));
-    __emit(mk('/media/blob.bin', 'application/octet-stream', btoa('\0\x01\x02\x03binary'), 'base64'));
-    __emit(mk('/media/page.html', 'text/html', '<h1>Hello page</h1>', ''));
-    const noCopy = mk('/media/nocopy', 'image/png', '', '');
-    noCopy.response.headers = [{ name: 'content-length', value: '70' }];
-    __emit(noCopy);
-    const empty = mk('/media/empty', 'text/plain', '', '');
-    empty.response.status = 204;
-    __emit(empty);
-    const failed = mk('/media/failed', '', '', '');
-    failed.response.status = 0;
-    failed.response._error = 'net::ERR_FAILED';
-    __emit(failed);
-    const redirect = mk('/media/redirect', '', '', '');
-    redirect.response.status = 302;
-    redirect.response.headers = [{ name: 'location', value: '/media/img.png' }];
-    __emit(redirect);
-  }, PNG);
+    const media = (path, o) => harEntry({ started: `media-${path}`, time: 5, url: `http://localhost:8765${path}`, ...o });
+    __emit(media('/media/img.png', { mime: 'image/png', content: png, encoding: 'base64' }));
+    __emit(media('/media/clip.mp4', { mime: 'video/mp4', content: btoa('\0\0\0\x20ftypisom not really a video'), encoding: 'base64' }));
+    __emit(media('/media/blob.bin', { mime: 'application/octet-stream', content: btoa('\0\x01\x02\x03binary'), encoding: 'base64' }));
+    __emit(media('/media/page.html', { mime: 'text/html', content: '<h1>Hello page</h1>' }));
+    __emit(media('/media/nocopy', { mime: 'image/png', resHeaders: [{ name: 'content-length', value: '70' }] }));
+    __emit(media('/media/empty', { mime: 'text/plain', status: 204 }));
+    __emit(media('/media/failed', { mime: '', status: 0, error: 'net::ERR_FAILED' }));
+    __emit(media('/media/redirect', { mime: '', status: 302, resHeaders: [{ name: 'location', value: '/media/img.png' }] }));
+  }, PNG_1x1);
   await page.click('#listTabs button[data-tab=captured]');
   await page.fill('#filterInput', '/media/');
-  await listHas(8);
+  await listHas(8, 'media filter');
   const pick = async (path) => {
     await page.locator('#requestList li[data-id]', { hasText: path }).first().click();
     await page.click('#resTabs button[data-tab=resBody]');
@@ -293,38 +287,40 @@ const server = http.createServer((req, res) => {
   const imgLoaded = () => page.waitForFunction(() => document.querySelector('#resPreview img')?.naturalWidth === 1, null, { timeout: 3000 }).then(() => true, () => false);
 
   await pick('/media/img.png');
-  const recordedImage = await imgLoaded();
-  const imageCaption = await page.textContent('#resPreview .caption');
+  check('recorded image previewed', await imgLoaded(), true);
+  match('image caption', await page.textContent('#resPreview .caption'), /^1 × 1 · image\/png/);
   const [download] = await Promise.all([page.waitForEvent('download', { timeout: 3000 }).catch(() => null), page.click('#saveResBtn')]);
-  const savedName = download?.suggestedFilename();
+  check('Save downloads the file', download?.suggestedFilename(), 'img.png');
   await page.click('#resMode button[data-mode=raw]');
-  const imageHex = await page.textContent('#resBody');
+  includes('raw view is a hex dump', await page.textContent('#resBody'), '|.PNG');
   await page.click('#resMode button[data-mode=preview]');
   await page.click('#sendBtn');
   await sendDone().catch(() => {});
-  const sentImage = await imgLoaded();
+  check('replayed image previewed', await imgLoaded(), true);
 
   await pick('/media/clip.mp4');
-  const videoEl = await page.locator('#resPreview video').count();
+  check('video preview', await page.locator('#resPreview video').count(), 1);
 
   await pick('/media/blob.bin');
   const binHex = await page.textContent('#resBody');
-  const copyHiddenForBinary = !(await page.isVisible('#copyResBtn'));
+  match('binary shows its type', binHex, /^application\/octet-stream/);
+  includes('binary hex dump', binHex, '00 01 02 03');
+  check('Copy hidden for binary', await page.isVisible('#copyResBtn'), false);
 
   await pick('/media/page.html');
-  const htmlRaw = await page.textContent('#resBody');
+  check('HTML shown raw by default', await page.textContent('#resBody'), '<h1>Hello page</h1>');
   await page.click('#resMode button[data-mode=preview]');
-  const htmlFrame = await page.locator('#resPreview iframe').getAttribute('srcdoc');
-  const htmlSandbox = await page.locator('#resPreview iframe').getAttribute('sandbox');
+  includes('HTML preview in an iframe', await page.locator('#resPreview iframe').getAttribute('srcdoc'), '<h1>Hello page</h1>');
+  check('HTML preview sandboxed', await page.locator('#resPreview iframe').getAttribute('sandbox'), '');
 
   await pick('/media/nocopy');
-  const noCopyNotice = await page.textContent('#resPreview .notice').catch(() => '');
+  includes('no-copy notice', await page.textContent('#resPreview .notice').catch(() => ''), 'kept no copy');
   await pick('/media/empty');
-  const emptyMessage = await page.textContent('#resBody');
+  check('empty body message', await page.textContent('#resBody'), 'Empty response body.');
   await pick('/media/failed');
-  const failedNotice = await page.textContent('#resPreview .notice').catch(() => '');
+  includes('failed request notice', await page.textContent('#resPreview .notice').catch(() => ''), 'net::ERR_FAILED');
   await pick('/media/redirect');
-  const redirectMessage = await page.textContent('#resBody');
+  check('redirect message', await page.textContent('#resBody'), 'Redirect → /media/img.png');
   // Multipart bodies get a warning in the body status line.
   await page.click('#newListBtn');
   await page.selectOption('#method', 'POST');
@@ -334,79 +330,81 @@ const server = http.createServer((req, res) => {
   await page.click('#bulkBtn');
   await page.click('#reqTabs button[data-tab=body]');
   await page.fill('#body', '--x\r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n--x--');
-  const multipartWarning = await page.textContent('#bodyStatus');
+  match('multipart warning', await page.textContent('#bodyStatus'), /^⚠ Multipart/);
   await page.click('#listTabs button[data-tab=captured]');
 
-  // ---------- polish round 3 ----------
-  // Info line on captured requests.
-  const infoLine = await page.textContent('#info');
+  // ---------- editor: info line, Enter to send, DevTools search, JSON validation, cancel, errors ----------
+  match('info line on a captured request', await page.textContent('#info'), /^Captured( [^·]+)? · fetch · 5 ms$/);
 
   // Enter in the URL field sends.
   await page.click('#newListBtn');
   await page.fill('#url', 'http://localhost:8765/echo?x=1');
   await page.press('#url', 'Enter');
   await sendDone();
-  const enterSent = JSON.parse(await page.textContent('#resBody')).url === '/echo?x=1';
+  check('Enter sends', JSON.parse(await page.textContent('#resBody')).url, '/echo?x=1');
 
   // Search through DevTools' search bar (devtools.js forwards to window.postcatSearch).
   // Expected count straight from the rendered text (case-insensitive, non-overlapping).
   const expectedMatches = await page.evaluate(() => document.getElementById('resBody').textContent.toLowerCase().split('e').length - 1);
+  ok('search fixture has several matches', expectedMatches > 5, `${expectedMatches} matches`);
   await page.evaluate(() => window.postcatSearch('performSearch', 'E'));
-  const searchFirst = await page.textContent('#searchCount');
-  const searchHighlights = await page.evaluate(() => CSS.highlights.get('postcat-match')?.size || 0);
+  check('search count', await page.textContent('#searchCount'), `1 / ${expectedMatches}`);
+  check('search highlights', await page.evaluate(() => CSS.highlights.get('postcat-match')?.size || 0), expectedMatches);
   await page.evaluate(() => window.postcatSearch('nextSearchResult'));
-  const searchSecond = await page.textContent('#searchCount');
+  check('next search result', await page.textContent('#searchCount'), `2 / ${expectedMatches}`);
   await page.evaluate(() => window.postcatSearch('performSearch', '"x-from'));  // no match in this body
-  const searchNone = await page.textContent('#searchCount');
+  check('no matches', await page.textContent('#searchCount'), 'No matches');
   await page.evaluate(() => window.postcatSearch('cancelSearch'));
-  const searchHidden = !(await page.isVisible('#searchCount'));
+  check('search count hidden after cancel', await page.isVisible('#searchCount'), false);
 
   // JSON validation of the request body.
   await page.selectOption('#method', 'POST');
   await page.click('#reqTabs button[data-tab=body]');
   await page.fill('#body', '{"a": 1,}');
-  const badStatus = await page.textContent('#bodyStatus');
-  const badMark = await page.getAttribute('#reqBodyMark', 'class');
+  includes('JSON error position', await page.textContent('#bodyStatus'), 'line 1, column 9');
+  includes('JSON error mark', await page.getAttribute('#reqBodyMark', 'class'), 'bad');
   await page.fill('#body', '{"a": 1}');
-  const goodStatus = await page.textContent('#bodyStatus');
+  check('valid JSON status', await page.textContent('#bodyStatus'), '✓ Valid JSON');
 
   // Cancel a slow request.
   await page.fill('#url', 'http://localhost:8765/slow');
   await page.click('#sendBtn');
-  const cancelLabel = await page.textContent('#sendBtn');
+  check('button reads Cancel while sending', await page.textContent('#sendBtn'), 'Cancel');
   const t0 = Date.now();
   await page.click('#sendBtn');
-  await page.waitForFunction(() => document.getElementById('resBody').textContent === 'Request cancelled.', null, { timeout: 3000 }).catch(() => {});
-  const cancelled = (await page.textContent('#resBody')) === 'Request cancelled.' && Date.now() - t0 < 3000;
-  const sendLabelBack = await page.textContent('#sendBtn');
+  await settle(() => document.getElementById('resBody').textContent === 'Request cancelled.', null, 3000);
+  check('cancelled', await page.textContent('#resBody'), 'Request cancelled.');
+  ok('cancel is immediate', Date.now() - t0 < 3000, `took ${Date.now() - t0} ms`);
+  check('button reads Send again', await page.textContent('#sendBtn'), 'Send');
 
   // Readable network errors.
   await page.fill('#url', 'http://localhost:1/nothing');
   await page.click('#sendBtn');
   await sendDone().catch(() => {});
-  await page.waitForFunction(() => /Couldn’t reach/.test(document.getElementById('resBody').textContent), null, { timeout: 5000 }).catch(() => {});
-  const networkError = await page.textContent('#resBody');
+  await settle(() => /Couldn’t reach/.test(document.getElementById('resBody').textContent), null, 5000);
+  match('network error message', await page.textContent('#resBody'), /^Couldn’t reach localhost:1\./);
 
-  // ---------- bugfix sprint regressions ----------
-  const setUrl = async (url) => { await page.fill('#url', url); };
-  const newRequest = async (url) => { await page.click('#newListBtn'); await setUrl(url); };
+  // ---------- data fidelity and list bookkeeping ----------
+  const newRequest = async (url) => { await page.click('#newListBtn'); await page.fill('#url', url); };
 
   // Big integers survive response formatting and request-body beautify.
   await newRequest('http://localhost:8765/big');
   await page.click('#sendBtn');
   await sendDone();
   const bigResponse = await page.textContent('#resBody');
+  includes('big integer kept in the response', bigResponse, '12345678901234567890');
+  includes('number spelling kept in the response', bigResponse, '1.10');
   await page.selectOption('#method', 'POST');
   await page.click('#reqTabs button[data-tab=body]');
   await page.fill('#body', '{"id":12345678901234567890}');
   await page.click('#beautifyBtn');
-  const bigBeautified = await page.inputValue('#body');
+  check('Beautify keeps big integers', await page.inputValue('#body'), '{\n  "id": 12345678901234567890\n}');
 
   // Editing one query param keeps the others byte-for-byte.
   await newRequest('http://localhost:8765/p?redirect=https%3A%2F%2Fx.com%2F&q=a+b&sig=abc');
   await page.click('#reqTabs button[data-tab=params]');
   await page.locator('#paramsView .kv-row').nth(2).locator('.kv-value').fill('xyz');
-  const paramUrl = await page.inputValue('#url');
+  check('untouched params kept raw', await page.inputValue('#url'), 'http://localhost:8765/p?redirect=https%3A%2F%2Fx.com%2F&q=a+b&sig=xyz');
 
   // Deleting a request while it's sending, then Undo: not stuck on "Cancel", queue not blocked.
   await newRequest('http://localhost:8765/slow');
@@ -414,30 +412,26 @@ const server = http.createServer((req, res) => {
   await page.evaluate(() => document.activeElement.blur());
   await page.keyboard.press('Delete');
   await page.click('#toastAction');
-  const afterUndoLabel = await page.textContent('#sendBtn');
+  check('Send button after Delete + Undo', await page.textContent('#sendBtn'), 'Send');
   const t1 = Date.now();
-  await setUrl('http://localhost:8765/after-undo');
+  await page.fill('#url', 'http://localhost:8765/after-undo');
   await page.click('#sendBtn');
   await sendDone();
-  const queueFree = Date.now() - t1 < 3000 && (await page.textContent('#resBody')).includes('/after-undo');
+  includes('next send goes through', await page.textContent('#resBody'), '/after-undo');
+  ok('queue not blocked by the abandoned send', Date.now() - t1 < 3000, `took ${Date.now() - t1} ms`);
 
   // Identical requests in the same millisecond are two entries; Import adds only what's missing.
   await page.click('#listTabs button[data-tab=captured]');
   await page.fill('#filterInput', '/twin');
   await page.evaluate(() => {
-    const mk = () => ({
-      startedDateTime: 'twin-ms', time: 3, _resourceType: 'fetch',
-      request: { method: 'GET', url: 'http://localhost:8765/twin', headers: [] },
-      response: { status: 200, statusText: 'OK', headers: [], content: { size: 2, mimeType: 'application/json' } },
-      getContent: (cb) => cb('{}', ''),
-    });
-    __emit(mk());
-    __emit(mk());
-    window.__har = [mk(), mk(), mk()];
+    const twin = () => harEntry({ started: 'twin-ms', time: 3, url: 'http://localhost:8765/twin', content: '{}' });
+    __emit(twin());
+    __emit(twin());
+    window.__har = [twin(), twin(), twin()];
   });
-  const twinsLive = await listHas(2);
+  await listHas(2, 'identical requests');
   await page.click('#importBtn');
-  const twinsImported = await listHas(3);
+  await listHas(3, 'Import adds only the missing one');
 
   // Clear + Undo keeps sent responses; Import after Clear doesn't bring cleared requests back.
   await page.locator('#requestList li[data-id]').first().click();
@@ -445,137 +439,75 @@ const server = http.createServer((req, res) => {
   await sendDone();
   await page.click('#clearBtn');
   await page.click('#importBtn');
-  const nothingReimported = await listHas(0);
+  await listHas(0, 'Import after Clear');
   // The Import toast replaced Clear's Undo, so test Undo from a fresh capture.
-  await page.evaluate(() => {
-    __emit({
-      startedDateTime: 'solo', time: 3, _resourceType: 'fetch',
-      request: { method: 'GET', url: 'http://localhost:8765/twin-solo', headers: [] },
-      response: { status: 299, statusText: 'Recorded', headers: [], content: { size: 2, mimeType: 'application/json' } },
-      getContent: (cb) => cb('{}', ''),
-    });
-  });
-  await listHas(1);
+  await page.evaluate(() => __emit(harEntry({ started: 'solo', time: 3, url: 'http://localhost:8765/twin-solo', status: 299, statusText: 'Recorded', content: '{}' })));
+  await listHas(1, 'fresh capture');
   await page.locator('#requestList li[data-id]').first().click();
   await page.click('#sendBtn');
   await sendDone();
   await page.click('#clearBtn');
   await page.click('#toastAction');
-  await listHas(1);
-  const statusAfterUndo = await page.locator('#requestList li[data-id] .status').first().textContent();
+  await listHas(1, 'Clear + Undo');
+  check('sent response kept across Clear + Undo', await page.locator('#requestList li[data-id] .status').first().textContent(), '200');
 
   // The 1000-entry cap never drops the request open in the editor.
   await page.fill('#filterInput', '');
   await page.evaluate(() => {
-    for (let i = 0; i < 1000; i++) {
-      __emit({
-        startedDateTime: `bulk-${i}`, time: 1, _resourceType: 'fetch',
-        request: { method: 'GET', url: `http://localhost:8765/bulk/${i}`, headers: [] },
-        response: { status: 200, statusText: 'OK', headers: [], content: { size: 0, mimeType: '' } },
-        getContent: (cb) => cb('', ''),
-      });
-    }
+    for (let i = 0; i < 1000; i++) __emit(harEntry({ started: `bulk-${i}`, url: `http://localhost:8765/bulk/${i}`, mime: '' }));
   });
-  await page.waitForFunction(() => document.querySelectorAll('#requestList li[data-id]').length === 1000, null, { timeout: 5000 }).catch(() => {});
-  const selectedSurvives = await page.evaluate(() => JSON.stringify({
-    kept: document.querySelector('#requestList li.selected') !== null,
-    count: document.querySelectorAll('#requestList li[data-id]').length,
-  }));
+  await listHas(1000, 'capped list', 5000);
+  check('selected row survives the cap', await page.locator('#requestList li.selected').count(), 1);
 
-  // ---------- sprint 2: panel ----------
+  // ---------- list: key repeat, scroll position, corrupt storage ----------
   // Holding Delete (key repeat) removes only one request.
   await page.click('#listTabs button[data-tab=captured]');
   await page.fill('#filterInput', '/bulk/');
-  await listHas(999);
+  await listHas(999, 'bulk filter');
   await page.locator('#requestList li[data-id]').first().click();
   await page.evaluate(() => {
     document.activeElement.blur();
     for (let i = 0; i < 5; i++) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', repeat: i > 0, bubbles: true }));
   });
-  const removedByRepeat = (await listHas(998)) ? 1 : -1;
+  await listHas(998, 'key repeat removes one');
 
   // Typing in the editor must not scroll the list back to the selected row.
-  await page.locator('#requestList li[data-id]').first().click();
-  await page.waitForTimeout(100); // let the selection render (rAF) before scrolling away
+  const secondSelected = () => document.querySelectorAll('#requestList li[data-id]')[1]?.classList.contains('selected');
+  await page.locator('#requestList li[data-id]').nth(1).click();
+  await settle(secondSelected);
+  check('clicked row selected', await page.evaluate(secondSelected), true);
   await page.evaluate(() => { document.getElementById('requestList').scrollTop = 4000; });
   const scrollBefore = await page.evaluate(() => document.getElementById('requestList').scrollTop);
   await page.type('#url', 'x');
-  await page.waitForTimeout(80);
-  const scrollAfter = await page.evaluate(() => document.getElementById('requestList').scrollTop);
+  // The edit re-renders the list on the next frame (the edited marker appears); the scroll position must survive it.
+  await settle(() => document.querySelector('#requestList li.selected .edited'));
+  check('list re-rendered after typing', await page.locator('#requestList li.selected .edited').count(), 1);
+  ok('list scrolled away', scrollBefore > 0, `scrollTop ${scrollBefore}`);
+  check('typing keeps the scroll position', await page.evaluate(() => document.getElementById('requestList').scrollTop), scrollBefore);
 
   // Corrupt saved records and invalid layout in storage must not break the panel.
+  // The panel flushes pending debounced writes on pagehide (storage.js), which would overwrite what
+  // is injected here: wait for the last settings change (the filter) to land in storage first.
+  check('filter persisted before reload', (await stored('postcat.settings', (s) => s?.filterText === '/bulk/'))?.filterText, '/bulk/');
   await page.evaluate(() => chrome.storage.local.set({
     'postcat.saved': [{ name: 'ok', method: 'get', url: 'http://a.test', headersText: '', body: '' }, { url: 'http://no-method.test' }, null, 'junk'],
     'postcat.settings': { layout: { sidebarW: null, reqW: 'wide' }, tab: 'saved', reqTab: 'nope' },
   }));
   await page.reload();
-  await page.waitForFunction(() => document.querySelectorAll('#requestList li[data-id]').length === 2, null, { timeout: 3000 }).catch(() => {});
+  await listHas(2, 'valid records after reload', 3000);
   const afterReload = await page.evaluate(() => ({
     saved: [...document.querySelectorAll('#requestList li[data-id]')].map((li) => li.title.split('\n')[0]),
     columns: getComputedStyle(document.querySelector('.app')).gridTemplateColumns,
     sidebarW: document.documentElement.style.getPropertyValue('--sidebar-w'),
   }));
+  check('corrupt records skipped', afterReload.saved, ['GET http://a.test', 'GET http://no-method.test']);
+  match('invalid layout falls back to numbers', afterReload.columns, /^\d+(\.\d+)?px \d+(\.\d+)?px \d+(\.\d+)?px$/);
+  check('sidebar width default', afterReload.sidebarW, '320px');
 
-  const ui = {
-
-    listCount, filtered,
-    recordedBody: recordedBody.includes('"recorded": true'),
-    sentBody: sent.body === '{"name":"edited"}', sentCookie: sent.headers.cookie === 'sid=1',
-    highlighted: highlighted > 0,
-    recordedToggle: recordedAgain.includes('"recorded": true'),
-    saved: stored['postcat.saved']?.length === 1,
-    editedMarker: editedMarker === 1, resetVisible, headerCount: headerCount === '2',
-    saveHiddenForSaved, autosave: autosaved['postcat.saved']?.[0]?.name === 'My call',
-    navDown: navDown.endsWith('/users?page=1'), navUp: navUp.endsWith('/users'),
-    reset: bodyAfterReset === '{"name":"cat"}' && markerAfterReset === 0,
-    paramCount: paramCount === '1', paramsEditUrl: urlWithParam.endsWith('/users?page=1&limit=5'),
-    headerToggle: headerCountAfterToggle === '1',
-    curlImport: curlUrl.endsWith('/from-curl') && curlMethod === 'POST',
-    curlSend: curlEcho.headers['x-from'] === 'curl' && curlEcho.body === 'hi',
-    deleteUndo: savedBefore === 2 && deleted && undone,
-    settingsPersisted: settings?.reqTab === 'headers' && settings?.tab === 'saved',
-    importBodyAfterNavigation: importedBody.includes('"imported": true'),
-    swMedia,
-    recordedImage, imageCaption: imageCaption.startsWith('1 × 1 · image/png'),
-    saveDownload: savedName === 'img.png',
-    imageRawHex: imageHex.includes('|.PNG'),
-    sentImage,
-    videoPreview: videoEl === 1,
-    binaryHex: binHex.startsWith('application/octet-stream') && binHex.includes('00 01 02 03'),
-    copyHiddenForBinary,
-    htmlRawDefault: htmlRaw === '<h1>Hello page</h1>',
-    htmlPreview: htmlFrame?.includes('<h1>Hello page</h1>') && htmlSandbox === '',
-    noCopyNotice: noCopyNotice.includes('kept no copy'),
-    infoLine: /^Captured( [^·]+)? · fetch · 5 ms$/.test(infoLine),
-    enterSent,
-    search: expectedMatches > 5 && searchFirst === `1 / ${expectedMatches}` && searchHighlights === expectedMatches
-      && searchSecond === `2 / ${expectedMatches}` && searchNone === 'No matches' && searchHidden,
-    jsonStatus: badStatus.includes('line 1, column 9') && badMark.includes('bad') && goodStatus === '✓ Valid JSON',
-    cancel: cancelLabel === 'Cancel' && cancelled && sendLabelBack === 'Send',
-    networkError: networkError.startsWith('Couldn’t reach localhost:1.'),
-    bigIntResponse: bigResponse.includes('12345678901234567890') && bigResponse.includes('1.10'),
-    bigIntBeautify: bigBeautified === '{\n  "id": 12345678901234567890\n}',
-    paramsRawKept: paramUrl === 'http://localhost:8765/p?redirect=https%3A%2F%2Fx.com%2F&q=a+b&sig=xyz',
-    deleteUndoNotStuck: afterUndoLabel === 'Send' && queueFree,
-    identicalRequests: twinsLive && twinsImported,
-    clearThenImport: nothingReimported,
-    clearUndoKeepsSent: statusAfterUndo === '200',
-    capKeepsSelected: JSON.parse(selectedSurvives).kept && JSON.parse(selectedSurvives).count === 1000,
-    keyRepeatDeletesOne: removedByRepeat === 1,
-    noScrollOnTyping: scrollBefore > 0 && scrollAfter === scrollBefore,
-    corruptStorage: afterReload.saved.join(',') === 'GET http://a.test,GET http://no-method.test'
-      && /^\d+(\.\d+)?px \d+(\.\d+)?px \d+(\.\d+)?px$/.test(afterReload.columns) && afterReload.sidebarW === '320px',
-    emptyBody: emptyMessage === 'Empty response body.',
-    failedNotice: failedNotice.includes('net::ERR_FAILED'),
-    redirectMessage: redirectMessage === 'Redirect → /media/img.png',
-    multipartWarning: multipartWarning.startsWith('⚠ Multipart'),
-  };
-  console.log('UI checks', ui);
-  for (const [k, ok] of Object.entries(ui)) assert.ok(ok, `UI check failed: ${k}`);
   if (process.env.SCREENSHOT) await page.screenshot({ path: process.env.SCREENSHOT });
-  assert.deepStrictEqual(errors, [], 'panel threw errors');
+  check('no uncaught panel errors', errors, []);
   await ctx.close();
-  fs.rmSync(ext, { recursive: true, force: true });
-  console.log('e2e ok');
+  cleanup();
   server.close();
+  console.log(`e2e ok (${passed} checks)`);
 })().catch((e) => { console.error(e); process.exit(1); });

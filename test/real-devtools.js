@@ -1,5 +1,9 @@
 // Runs Postcat inside a real Chrome with real DevTools (no API stubs).
 // Opens DevTools, shows the Postcat panel via the DevTools frontend, and drives it over CDP.
+// Chrome is driven over raw CDP with no Playwright page handle, so there is nothing like
+// waitForFunction here: targets are polled (waitForTarget) because their appearance is observable
+// from /json/list, while everything else (network round trips, DevTools forwarding, panel renders)
+// waits a fixed sleep() sized generously above the expected latency.
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import fs from 'node:fs';

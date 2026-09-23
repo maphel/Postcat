@@ -1,4 +1,4 @@
-// Regression tests for the bugfix sprint (2026-09-23).
+// Regression tests for src/lib: each case pins a fixed bug so it cannot come back.
 import test from 'node:test';
 import assert from 'node:assert';
 import * as lib from '../src/lib/index.js';
@@ -35,7 +35,7 @@ test('parseCurl: empty --data-raw still means POST', () => {
   assert.strictEqual(lib.parseCurl("curl https://a.test --data-raw ''").method, 'POST');
 });
 
-// ---------- sprint 2 ----------
+// ---------- JSON errors, text decoding, cURL parsing, formatting ----------
 
 test('jsonError survives absurd nesting depth', () => {
   const e = lib.jsonError('['.repeat(20000));
