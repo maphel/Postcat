@@ -7,6 +7,7 @@ import { $, el, statusClass } from './dom.js';
 
 let frame = 0;
 let scrollToSelected = false;
+let rebuilding = false; // true while replaceChildren() runs: the blur it fires on a rename input is not a commit
 
 // Renders on the next animation frame. Read list state from visibleItems(), never from the DOM.
 export function renderList({ scroll = false } = {}) {
@@ -16,7 +17,13 @@ export function renderList({ scroll = false } = {}) {
     const items = visibleItems();
     const list = $('requestList');
     const hadFocus = list.contains(document.activeElement);
+    // A rename in progress survives the rebuild (e.g. a send finishing re-renders the list): its
+    // text and caret carry over to the recreated input.
+    const live = list.querySelector('input.rename');
+    const draft = live ? { value: live.value, start: live.selectionStart, end: live.selectionEnd } : null;
+    rebuilding = true;
     list.replaceChildren(...(items.length ? items.map(renderListItem) : [emptyListItem()]));
+    rebuilding = false;
     const selected = list.querySelector('li.selected');
     // Only when the selection changed — not on every keystroke in the editor.
     if (scrollToSelected) selected?.scrollIntoView({ block: 'nearest' });
@@ -26,7 +33,12 @@ export function renderList({ scroll = false } = {}) {
     const renaming = list.querySelector('input.rename');
     if (renaming) {
       renaming.focus({ preventScroll: true });
-      renaming.select();
+      if (draft) {
+        renaming.value = draft.value;
+        renaming.setSelectionRange(draft.start, draft.end);
+      } else {
+        renaming.select();
+      }
     }
     $('capturedCount').textContent = state.captured.length || '';
     $('savedCount').textContent = state.saved.length || '';
@@ -112,7 +124,8 @@ function renameInput(item) {
     if (e.key === 'Enter') endRename(true);
     else if (e.key === 'Escape') endRename(false);
   });
-  input.addEventListener('blur', () => endRename(true));
+  // Chrome fires blur when the focused input is removed: a rebuild of the rows is not a commit.
+  input.addEventListener('blur', () => { if (!rebuilding && input.isConnected) endRename(true); });
   input.addEventListener('click', (e) => e.stopPropagation()); // a click in the input is not a row selection
   return input;
 }

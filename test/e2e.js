@@ -229,6 +229,28 @@ function ok(name, condition, detail) {
   check('right-click on a saved row opens the request menu with Rename', await page.evaluate(() => [document.getElementById('moreMenu').matches(':popover-open'), ['renameBtn', 'dupBtn', 'curlBtn', 'deleteBtn'].map((id) => document.getElementById(id).checkVisibility()), document.getElementById('moreBtn').getAttribute('aria-expanded')]), [true, [true, true, true, true], 'true']);
   await page.keyboard.press('Escape');
   check('Escape closes the row menu', await page.evaluate(() => [document.getElementById('moreMenu').matches(':popover-open'), document.getElementById('moreBtn').getAttribute('aria-expanded')]), [false, 'false']);
+  // A list re-render (here: a send finishing) does not end a rename in progress: text and focus survive.
+  await page.fill('#url', 'http://localhost:8765/slow');
+  await page.click('#sendBtn');
+  await page.focus('#requestList li.selected');
+  await page.keyboard.press('F2');
+  await settle(() => document.activeElement?.id === 'name');
+  await page.fill('#name', 'Typed during send');
+  await sendDone();
+  await settle(() => document.querySelector('#requestList li.selected .status')?.textContent === '200'); // the list re-rendered with the result
+  check('rename survives a list re-render while typing', await page.evaluate(() => [document.activeElement.id, document.getElementById('name').value, document.querySelector('#requestList li.selected .status').textContent]), ['name', 'Typed during send', '200']);
+  await page.press('#name', 'Enter');
+  check('rename committed after the re-render', (await stored('postcat.saved', (s) => s?.[0]?.name === 'Typed during send'))?.[0]?.name, 'Typed during send');
+  await page.fill('#url', 'http://localhost:8765/users');
+  // Renaming a request the filter hides: the filter is cleared so the row and its input show.
+  await page.fill('#filterInput', 'zzz-no-match');
+  await listHas(0, 'filter hides the saved request');
+  await page.evaluate(() => document.activeElement.blur());
+  await page.keyboard.press('F2');
+  await settle(() => document.activeElement?.id === 'name');
+  check('Rename clears a filter that hides the request', [await page.inputValue('#filterInput'), await page.evaluate(() => document.activeElement.id)], ['', 'name']);
+  await page.press('#name', 'Escape');
+  await settle(() => !document.getElementById('name'));
 
   // ---------- panel: keyboard navigation, reset, params and headers tables, cURL paste, delete ----------
   // Captured / Saved are direct tabs with counts: Save switched to Saved, one click switches back,

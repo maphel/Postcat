@@ -41,6 +41,7 @@ export function rename() {
   const item = current();
   if (!item || item.kind !== 'saved') return;
   if (state.tab !== 'saved') switchTab('saved');
+  if (state.filter && !visibleItems().includes(item)) setFilter(''); // hidden by the filter: show the row to rename
   state.renaming = item.id;
   if (layoutMode() === 'narrow') showScreen('list');
   renderList({ scroll: true });
