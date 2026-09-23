@@ -141,6 +141,15 @@ function ok(name, condition, detail) {
     check(`${what}: ${n} rows`, await rows(), n);
   };
   const sendDone = () => waitForSendDone(page);
+  // Secondary actions live in popover menus: open the menu, click the item (the menu closes itself).
+  const viaMenu = async (trigger, item) => { await page.click(trigger); await page.click(item); };
+  // Whether a menu item is offered right now (menus hide what doesn't apply), leaving the menu closed.
+  const inMenu = async (trigger, item) => {
+    await page.click(trigger);
+    const visible = await page.isVisible(item);
+    await page.keyboard.press('Escape');
+    return visible;
+  };
   // chrome.storage writes are debounced (storage.js): waits until `key` holds a record `test`
   // accepts (page.waitForFunction can't await the async storage API), then returns what is there.
   const stored = async (key, test = () => true, timeout = 2000) => {
@@ -169,22 +178,22 @@ function ok(name, condition, detail) {
   check('recorded cookie sent', replayed.headers.cookie, 'sid=1');
   ok('JSON response highlighted', (await page.locator('#resBody .j-key').count()) > 0, 'no .j-key spans');
   check('edited marker on the row', await page.locator('#requestList li.selected .edited').count(), 1);
-  check('Reset visible', await page.isVisible('#resetBtn'), true);
+  check('Reset offered in the More menu', await inMenu('#moreBtn', '#resetBtn'), true);
   check('header count', await page.textContent('#reqHeaderCount'), '2');
   // Recorded vs. sent response toggle.
-  await page.click('#resSource button[data-view=recorded]');
+  await page.selectOption('#resSource', 'recorded');
   includes('recorded view', await page.textContent('#resBody'), '"recorded": true');
-  await page.click('#resSource button[data-view=sent]');
+  await page.selectOption('#resSource', 'sent');
 
   await page.click('#saveBtn');
   check('saved to storage', (await stored('postcat.saved', (s) => s?.length === 1))?.length, 1);
-  check('Save hidden for a saved item', await page.isVisible('#saveBtn'), false);
+  check('Save disabled for a saved item (autosave)', await page.isDisabled('#saveBtn'), true);
   // Saved items autosave.
   await page.fill('#name', 'My call');
   check('name autosaved', (await stored('postcat.saved', (s) => s?.[0]?.name === 'My call'))?.[0]?.name, 'My call');
 
   // ---------- panel: keyboard navigation, reset, params and headers tables, cURL paste, delete ----------
-  await page.click('#listTabs button[data-tab=captured]');
+  await page.selectOption('#collection', 'captured');
   await page.fill('#filterInput', '');
   await page.evaluate(() => document.activeElement.blur());
   await page.keyboard.press('ArrowDown');
@@ -192,7 +201,7 @@ function ok(name, condition, detail) {
   match('ArrowDown selects the next row', await page.inputValue('#url'), /\/users\?page=1$/);
   await page.keyboard.press('ArrowUp');
   match('ArrowUp selects the previous row', await page.inputValue('#url'), /\/users$/);
-  await page.click('#resetBtn');
+  await viaMenu('#moreBtn', '#resetBtn');
   await settle(() => !document.querySelector('#requestList li .edited'));
   check('Reset restores the body', await page.inputValue('#body'), '{"name":"cat"}');
   check('Reset clears the marker', await page.locator('#requestList li .edited').count(), 0);
@@ -243,10 +252,10 @@ function ok(name, condition, detail) {
     entry.getContent = (cb) => { const gone = window.__navigated; setTimeout(() => cb(gone ? null : '{"imported":true}', ''), 10); };
     window.__har = [entry];
   });
-  await page.click('#importBtn');
+  await viaMenu('#captureBtn', '#importBtn');
   await page.evaluate(() => { window.__navigated = true; });
   await page.fill('#filterInput', 'imported');
-  await page.click('#listTabs button[data-tab=captured]');
+  await page.selectOption('#collection', 'captured');
   await listHas(1, 'imported');
   await page.locator('#requestList li[data-id]').first().click();
   await page.click('#resTabs button[data-tab=resBody]');
@@ -277,7 +286,7 @@ function ok(name, condition, detail) {
     __emit(media('/media/failed', { mime: '', status: 0, error: 'net::ERR_FAILED' }));
     __emit(media('/media/redirect', { mime: '', status: 302, resHeaders: [{ name: 'location', value: '/media/img.png' }] }));
   }, PNG_1x1);
-  await page.click('#listTabs button[data-tab=captured]');
+  await page.selectOption('#collection', 'captured');
   await page.fill('#filterInput', '/media/');
   await listHas(8, 'media filter');
   const pick = async (path) => {
@@ -289,7 +298,7 @@ function ok(name, condition, detail) {
   await pick('/media/img.png');
   check('recorded image previewed', await imgLoaded(), true);
   match('image caption', await page.textContent('#resPreview .caption'), /^1 × 1 · image\/png/);
-  const [download] = await Promise.all([page.waitForEvent('download', { timeout: 3000 }).catch(() => null), page.click('#saveResBtn')]);
+  const [download] = await Promise.all([page.waitForEvent('download', { timeout: 3000 }).catch(() => null), viaMenu('#resMenuBtn', '#saveResBtn')]);
   check('Save downloads the file', download?.suggestedFilename(), 'img.png');
   await page.click('#resMode button[data-mode=raw]');
   includes('raw view is a hex dump', await page.textContent('#resBody'), '|.PNG');
@@ -305,7 +314,8 @@ function ok(name, condition, detail) {
   const binHex = await page.textContent('#resBody');
   match('binary shows its type', binHex, /^application\/octet-stream/);
   includes('binary hex dump', binHex, '00 01 02 03');
-  check('Copy hidden for binary', await page.isVisible('#copyResBtn'), false);
+  check('Copy not offered for binary', await inMenu('#resMenuBtn', '#copyResBtn'), false);
+  check('Save offered for binary', await inMenu('#resMenuBtn', '#saveResBtn'), true);
 
   await pick('/media/page.html');
   check('HTML shown raw by default', await page.textContent('#resBody'), '<h1>Hello page</h1>');
@@ -325,13 +335,13 @@ function ok(name, condition, detail) {
   await page.click('#newListBtn');
   await page.selectOption('#method', 'POST');
   await page.click('#reqTabs button[data-tab=headers]');
-  await page.click('#bulkBtn');
+  await viaMenu('#reqMenuBtn', '#bulkBtn');
   await page.fill('#headers', 'Content-Type: multipart/form-data; boundary=x');
-  await page.click('#bulkBtn');
+  await viaMenu('#reqMenuBtn', '#bulkBtn');
   await page.click('#reqTabs button[data-tab=body]');
   await page.fill('#body', '--x\r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n--x--');
   match('multipart warning', await page.textContent('#bodyStatus'), /^⚠ Multipart/);
-  await page.click('#listTabs button[data-tab=captured]');
+  await page.selectOption('#collection', 'captured');
 
   // ---------- editor: info line, Enter to send, DevTools search, JSON validation, cancel, errors ----------
   match('info line on a captured request', await page.textContent('#info'), /^Captured( [^·]+)? · fetch · 5 ms$/);
@@ -397,7 +407,7 @@ function ok(name, condition, detail) {
   await page.selectOption('#method', 'POST');
   await page.click('#reqTabs button[data-tab=body]');
   await page.fill('#body', '{"id":12345678901234567890}');
-  await page.click('#beautifyBtn');
+  await viaMenu('#reqMenuBtn', '#beautifyBtn');
   check('Beautify keeps big integers', await page.inputValue('#body'), '{\n  "id": 12345678901234567890\n}');
 
   // Editing one query param keeps the others byte-for-byte.
@@ -421,7 +431,7 @@ function ok(name, condition, detail) {
   ok('queue not blocked by the abandoned send', Date.now() - t1 < 3000, `took ${Date.now() - t1} ms`);
 
   // Identical requests in the same millisecond are two entries; Import adds only what's missing.
-  await page.click('#listTabs button[data-tab=captured]');
+  await page.selectOption('#collection', 'captured');
   await page.fill('#filterInput', '/twin');
   await page.evaluate(() => {
     const twin = () => harEntry({ started: 'twin-ms', time: 3, url: 'http://localhost:8765/twin', content: '{}' });
@@ -430,15 +440,15 @@ function ok(name, condition, detail) {
     window.__har = [twin(), twin(), twin()];
   });
   await listHas(2, 'identical requests');
-  await page.click('#importBtn');
+  await viaMenu('#captureBtn', '#importBtn');
   await listHas(3, 'Import adds only the missing one');
 
   // Clear + Undo keeps sent responses; Import after Clear doesn't bring cleared requests back.
   await page.locator('#requestList li[data-id]').first().click();
   await page.click('#sendBtn');
   await sendDone();
-  await page.click('#clearBtn');
-  await page.click('#importBtn');
+  await viaMenu('#captureBtn', '#clearBtn');
+  await viaMenu('#captureBtn', '#importBtn');
   await listHas(0, 'Import after Clear');
   // The Import toast replaced Clear's Undo, so test Undo from a fresh capture.
   await page.evaluate(() => __emit(harEntry({ started: 'solo', time: 3, url: 'http://localhost:8765/twin-solo', status: 299, statusText: 'Recorded', content: '{}' })));
@@ -446,7 +456,7 @@ function ok(name, condition, detail) {
   await page.locator('#requestList li[data-id]').first().click();
   await page.click('#sendBtn');
   await sendDone();
-  await page.click('#clearBtn');
+  await viaMenu('#captureBtn', '#clearBtn');
   await page.click('#toastAction');
   await listHas(1, 'Clear + Undo');
   check('sent response kept across Clear + Undo', await page.locator('#requestList li[data-id] .status').first().textContent(), '200');
@@ -461,7 +471,7 @@ function ok(name, condition, detail) {
 
   // ---------- list: key repeat, scroll position, corrupt storage ----------
   // Holding Delete (key repeat) removes only one request.
-  await page.click('#listTabs button[data-tab=captured]');
+  await page.selectOption('#collection', 'captured');
   await page.fill('#filterInput', '/bulk/');
   await listHas(999, 'bulk filter');
   await page.locator('#requestList li[data-id]').first().click();
@@ -502,7 +512,145 @@ function ok(name, condition, detail) {
   }));
   check('corrupt records skipped', afterReload.saved, ['GET http://a.test', 'GET http://no-method.test']);
   match('invalid layout falls back to numbers', afterReload.columns, /^\d+(\.\d+)?px \d+(\.\d+)?px \d+(\.\d+)?px$/);
-  check('sidebar width default', afterReload.sidebarW, '320px');
+  check('sidebar width default', afterReload.sidebarW, '214px');
+
+  // ---------- layouts: wide / medium / narrow follow the panel width ----------
+  // One captured request with a recorded response and distinctive headers, replayed later for Recorded / Sent.
+  await page.setViewportSize({ width: 1024, height: 320 });
+  await page.selectOption('#collection', 'captured');
+  await page.evaluate(() => __emit(harEntry({
+    started: 'layout-1', time: 7, url: 'http://localhost:8765/layout?x=1',
+    resHeaders: [{ name: 'content-type', value: 'application/json' }, { name: 'x-source', value: 'recorded' }], content: '{"recorded":true}',
+  })));
+  await listHas(1, 'layout fixture');
+  await page.locator('#requestList li[data-id]').first().click();
+  const modeFor = (w) => (w >= 850 ? 'wide' : w >= 580 ? 'medium' : 'narrow');
+  const resize = async (w, h) => {
+    await page.setViewportSize({ width: w, height: h });
+    await settle((mode) => document.getElementById('app').dataset.layout === mode, modeFor(w));
+  };
+  // What the user can see at this size: the layout attributes, overflow of the app root, and whether
+  // the essential controls are on screen (rendered, and inside the viewport).
+  const shape = () => page.evaluate(() => {
+    const app = document.getElementById('app');
+    const onScreen = (id) => {
+      const el = document.getElementById(id);
+      const r = el.getBoundingClientRect();
+      return el.checkVisibility() && r.width > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth + .5 && r.bottom <= innerHeight + .5;
+    };
+    return {
+      layout: app.dataset.layout, screen: app.dataset.screen, view: app.dataset.view,
+      overflow: [app.scrollWidth > app.clientWidth, app.scrollHeight > app.clientHeight],
+      send: onScreen('sendBtn'), list: onScreen('requestList'), switcher: onScreen('viewTabs'), req: onScreen('reqTabs'), res: onScreen('resTabs'),
+      listScrolls: document.getElementById('requestList').scrollHeight > document.getElementById('requestList').clientHeight,
+    };
+  });
+  for (const [w, h] of [[1024, 320], [1024, 240], [850, 300], [680, 280], [580, 240], [380, 480], [320, 260]]) {
+    await resize(w, h);
+    const s = await shape();
+    const mode = modeFor(w);
+    check(`${w}×${h}: ${mode} layout`, s.layout, mode);
+    check(`${w}×${h}: app root does not overflow`, s.overflow, [false, false]);
+    check(`${w}×${h}: Send on screen`, s.send, true);
+    if (mode === 'wide') check(`${w}×${h}: list, request and response side by side`, [s.list, s.req, s.res, s.switcher], [true, true, true, false]);
+    else if (mode === 'medium') check(`${w}×${h}: list plus one switched pane`, [s.list, s.switcher, s.req, s.res], [true, true, s.view === 'request', s.view === 'response']);
+    else check(`${w}×${h}: details fill the width`, [s.screen, s.list, s.switcher, s.req || s.res], ['detail', false, true, true]);
+  }
+
+  // Drafts and the selection survive crossing both breakpoints while editing URL, param, header and body.
+  await resize(1024, 320);
+  await page.fill('#url', 'http://localhost:8765/layout?x=1&keep=me');
+  await page.click('#reqTabs button[data-tab=params]');
+  await page.locator('#paramsView .kv-row').nth(1).locator('.kv-value').fill('kept');
+  await page.click('#reqTabs button[data-tab=headers]');
+  await page.locator('#headersView .kv-row').last().locator('.kv-key').fill('X-Kept');
+  await page.locator('#headersView .kv-row').first().locator('.kv-value').fill('yes');
+  await page.click('#reqTabs button[data-tab=body]');
+  await page.fill('#body', '{"kept": true}');
+  const draft = () => page.evaluate(() => ({
+    url: document.getElementById('url').value, body: document.getElementById('body').value,
+    header: document.querySelector('#headersView .kv-row .kv-key').value + ': ' + document.querySelector('#headersView .kv-row .kv-value').value,
+    params: document.getElementById('reqParamCount').textContent, selected: document.querySelectorAll('#requestList li.selected').length,
+  }));
+  const expectedDraft = { url: 'http://localhost:8765/layout?x=1&keep=kept', body: '{"kept": true}', header: 'X-Kept: yes', params: '2', selected: 1 };
+  check('draft before resizing', await draft(), expectedDraft);
+  await resize(680, 280);
+  check('draft kept in the medium layout', await draft(), expectedDraft);
+  await resize(380, 480);
+  check('draft kept in the narrow layout', await draft(), expectedDraft);
+  await resize(1024, 320);
+  check('draft kept back in the wide layout', await draft(), expectedDraft);
+
+  // Focus follows the layout: a pane that loses its side-by-side place is the one shown, focus intact.
+  await page.focus('#resTabs button[data-tab=resHeaders]');
+  await resize(680, 280);
+  check('response pane shown because it had focus', await page.evaluate(() => [document.getElementById('app').dataset.view, document.activeElement.dataset.tab]), ['response', 'resHeaders']);
+
+  // Tab lists move with the arrow keys.
+  await page.click('#viewTabs button[data-view=request]');
+  await page.focus('#reqTabs button[data-tab=params]');
+  await page.keyboard.press('ArrowRight');
+  check('ArrowRight moves to the next tab', await page.evaluate(() => [document.activeElement.dataset.tab, document.getElementById('headersView').hidden]), ['headers', false]);
+
+  // Narrow: Requests opens the list (keyboard-accessible), a row returns to the details.
+  await resize(320, 260);
+  await page.click('#backBtn');
+  check('Requests opens the list', await page.evaluate(() => [document.getElementById('app').dataset.screen, document.activeElement.classList.contains('selected')]), ['list', true]);
+  await page.evaluate(() => { for (let i = 0; i < 40; i++) __emit(harEntry({ started: `rows-${i}`, url: `http://localhost:8765/rows/${i}`, content: '{}' })); });
+  await listHas(41, 'long narrow list');
+  check('long list scrolls inside the panel', (await shape()).listScrolls, true);
+  await page.evaluate(() => { const list = document.getElementById('requestList'); list.scrollTop = list.scrollHeight; });
+  await page.locator('#requestList li[data-id]').last().click();
+  match('selecting a row returns to the details', await page.inputValue('#url'), /\/layout\?x=1&keep=kept$/);
+  check('draft kept after list → details', (await draft()).body, '{"kept": true}');
+  await page.click('#backBtn');
+  await page.keyboard.press('ArrowUp');
+  await settle(() => document.activeElement?.title.startsWith('GET http://localhost:8765/rows/0')); // the list re-renders on the next frame
+  await page.keyboard.press('Enter');
+  check('ArrowUp + Enter opens the previous request', [await page.evaluate(() => document.getElementById('app').dataset.screen), await page.inputValue('#url')], ['detail', 'http://localhost:8765/rows/0']);
+  await page.click('#backBtn');
+  await page.locator('#requestList li[data-id]').last().click();
+
+  // Response: Body ↔ Headers directly, for Recorded and Sent; headers follow the source.
+  await page.click('#viewTabs button[data-view=response]');
+  await page.click('#resTabs button[data-tab=resHeaders]');
+  includes('recorded headers (narrow)', await page.textContent('#resHeaders'), 'x-source');
+  await page.click('#resTabs button[data-tab=resBody]');
+  includes('recorded body (narrow)', await page.textContent('#resBody'), '"recorded": true');
+  await page.click('#viewTabs button[data-view=request]');
+  await page.click('#sendBtn');
+  await sendDone();
+  check('Send reveals the response', await page.evaluate(() => document.getElementById('app').dataset.view), 'response');
+  check('Sent selected after the send', await page.inputValue('#resSource'), 'sent');
+  includes('sent body', await page.textContent('#resBody'), '"url": "/layout?x=1&keep=kept"');
+  await page.click('#resTabs button[data-tab=resHeaders]');
+  const sentHeaders = await page.textContent('#resHeaders');
+  ok('sent headers follow the source', sentHeaders.includes('content-type') && !sentHeaders.includes('x-source'), sentHeaders);
+  await page.selectOption('#resSource', 'recorded');
+  includes('recorded headers after switching the source', await page.textContent('#resHeaders'), 'x-source');
+  await page.click('#resTabs button[data-tab=resBody]');
+  includes('recorded body after switching the source', await page.textContent('#resBody'), '"recorded": true');
+  await resize(1024, 320);
+  await page.selectOption('#resSource', 'sent');
+  await page.click('#resTabs button[data-tab=resHeaders]');
+  check('Headers tab (wide)', await page.evaluate(() => [document.querySelector('#resTabs [data-tab=resHeaders]').getAttribute('aria-selected'), document.getElementById('resHeaders').hidden]), ['true', false]);
+  ok('sent headers (wide)', !(await page.textContent('#resHeaders')).includes('x-source'), 'recorded headers shown for the sent response');
+  await page.click('#resTabs button[data-tab=resBody]');
+  includes('sent body (wide)', await page.textContent('#resBody'), '"url": "/layout?x=1&keep=kept"');
+
+  // A request without a response shows an empty state, not a status.
+  await page.click('#newListBtn');
+  includes('empty response state', await page.textContent('#resBody'), 'No response yet');
+  check('no status without a response', [await page.textContent('#resStatus'), await page.textContent('#viewResStatus'), await page.isVisible('#resSource')], ['', '', false]);
+
+  // Appearance: Light / Dark / System, persisted with the settings.
+  await page.click('#captureBtn');
+  await page.click('#appearance button[data-appearance=light]');
+  check('light appearance', await page.evaluate(() => document.documentElement.classList.contains('dark')), false);
+  check('appearance persisted', (await stored('postcat.settings', (s) => s?.appearance === 'light'))?.appearance, 'light');
+  await page.click('#captureBtn');
+  await page.click('#appearance button[data-appearance=system]');
+  check('system appearance follows DevTools', await page.evaluate(() => document.documentElement.classList.contains('dark')), true);
 
   if (process.env.SCREENSHOT) await page.screenshot({ path: process.env.SCREENSHOT });
   check('no uncaught panel errors', errors, []);

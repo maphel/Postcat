@@ -1,4 +1,4 @@
-// The request editor: URL bar, params/headers/body tabs, status line.
+// The request editor: context row, URL bar, params/headers/body tabs, status line.
 import { parseHeaders, textToRows, rowsToText, urlToParams, paramsToUrl, formatTime, jsonError, expectsJson } from '../lib/index.js';
 import { state, current, isEdited, METHODS } from './state.js';
 import { persistSavedSoon } from './storage.js';
@@ -6,6 +6,7 @@ import { $, el } from './dom.js';
 import { createKvEditor } from './kv-editor.js';
 import { renderList } from './list.js';
 import { renderResponse } from './response.js';
+import { applyScreen } from './layout.js';
 
 // Called after any edit of the current item: autosave, counters, list badges.
 export function afterEdit(item) {
@@ -43,6 +44,7 @@ export function renderEditor() {
   const item = current();
   $('emptyState').hidden = !!item;
   $('editor').hidden = !item;
+  applyScreen();
   if (!item) return;
 
   const select = $('method');
@@ -56,7 +58,12 @@ export function renderEditor() {
   $('name').hidden = !saved;
   $('name').value = item.name || '';
   $('info').hidden = saved;
-  $('saveBtn').hidden = saved; // saved items autosave
+  // Saved items autosave: the bookmark stays (filled) so the row keeps its shape, but does nothing.
+  const saveBtn = $('saveBtn');
+  saveBtn.disabled = saved;
+  saveBtn.classList.toggle('saved', saved);
+  saveBtn.title = saved ? 'In your collection · changes are saved automatically' : 'Save to collection (⌘/Ctrl + S)';
+  saveBtn.setAttribute('aria-label', saved ? 'Saved to collection' : 'Save to collection');
 
   paramsKv.set(urlToParams(item.url));
   headersKv.set(textToRows(item.headersText));
@@ -70,7 +77,7 @@ export function renderEditor() {
 
 export function renderReqTab() {
   const tab = state.reqTab;
-  for (const b of $('reqTabs').querySelectorAll('button[data-tab]')) b.classList.toggle('active', b.dataset.tab === tab);
+  for (const b of $('reqTabs').querySelectorAll('button[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   $('paramsView').hidden = tab !== 'params';
   $('headersView').hidden = tab !== 'headers' || state.bulkHeaders;
   $('headers').hidden = tab !== 'headers' || !state.bulkHeaders;
@@ -78,6 +85,7 @@ export function renderReqTab() {
   $('bulkBtn').hidden = tab !== 'headers';
   $('bulkBtn').textContent = state.bulkHeaders ? 'Table view' : 'Bulk edit';
   $('beautifyBtn').hidden = tab !== 'body';
+  $('reqMenuBtn').hidden = tab === 'params'; // nothing to offer there
   const item = current();
   if (item) renderBodyStatus(item);
 }
@@ -89,7 +97,9 @@ function renderEditState() {
   $('reqParamCount').textContent = urlToParams(item.url).length || '';
   $('reqHeaderCount').textContent = parseHeaders(item.headersText).length || '';
   renderBodyStatus(item);
-  $('resetBtn').hidden = !isEdited(item);
+  const edited = isEdited(item);
+  $('resetBtn').hidden = !edited;
+  $('viewEdited').hidden = !edited;
   $('method').className = `m-${item.method.toLowerCase()}`;
 
   if (item.kind === 'captured') {
@@ -99,7 +109,8 @@ function renderEditState() {
     if (item.resourceType) parts.push(item.resourceType);
     if (item.recorded?.time != null) parts.push(formatTime(item.recorded.time));
     info.replaceChildren(parts.join(' · '));
-    if (isEdited(item)) info.append(' · ', el('span', 'edited-tag', 'edited'));
+    if (edited) info.append(' · ', el('span', 'edited-tag', 'edited'));
+    info.title = info.textContent;
   }
 }
 

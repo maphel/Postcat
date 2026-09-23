@@ -26,10 +26,14 @@ export function renderResponse() {
   $('sendBtn').classList.toggle('cancel', pending);
   $('sendBtn').title = pending ? 'Cancel this request' : 'Send (Enter in the URL field, or ⌘/Ctrl + Enter)';
 
+  // Recorded / Sent: shown for captured requests; "Sent" becomes available after a finished send.
   const canCompare = !!item.recorded && !!sent && !pending && !sent.cancelled;
   const view = canCompare ? item.view || 'sent' : null;
-  $('resSource').hidden = !canCompare;
-  for (const b of $('resSource').querySelectorAll('button')) b.classList.toggle('active', b.dataset.view === view);
+  const source = $('resSource');
+  source.hidden = !item.recorded;
+  source.disabled = !canCompare;
+  source.value = view || (sent && !sent.cancelled ? 'sent' : 'recorded');
+  source.querySelector('option[value=sent]').disabled = !canCompare;
 
   if (pending) {
     showResponse({ pending: true, placeholder: 'Sending…' });
@@ -43,8 +47,12 @@ export function renderResponse() {
     // Still arriving from DevTools? fetchRecordedBody's callback renders it.
     if (item.recordedBody) showRecordedBody(item);
   } else {
-    showResponse({ placeholder: 'Hit Send to see the response.' });
+    showResponse({ placeholder: 'No response yet.\nSend this request to see its response.' });
   }
+  const badge = $('viewResStatus');
+  const shownStatus = pending ? '…' : sent?.cancelled ? '' : sent && view !== 'recorded' ? (sent.error ? 0 : sent.status) : item.recorded?.status;
+  badge.textContent = shownStatus == null || shownStatus === '' ? '' : String(shownStatus || 'ERR');
+  badge.className = `status ${shownStatus == null || shownStatus === '' || pending ? '' : statusClass(shownStatus)}`;
 }
 
 function showResponse({ status, statusText, time, size, headers, body, bodyBase64, tooLarge, mimeType, redirected, url, placeholder, error, pending }) {
@@ -83,7 +91,7 @@ function renderResponseHeaders(headers) {
 }
 
 export function renderResTab() {
-  for (const b of $('resTabs').querySelectorAll('button[data-tab]')) b.classList.toggle('active', b.dataset.tab === state.resTab);
+  for (const b of $('resTabs').querySelectorAll('button[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === state.resTab));
   $('resBodyWrap').hidden = state.resTab !== 'resBody';
   $('resHeaders').hidden = state.resTab !== 'resHeaders';
   $('resMode').style.visibility = state.resTab === 'resBody' ? '' : 'hidden';
@@ -211,7 +219,12 @@ function renderContent(model, url) {
     return;
   }
   const mode = PREVIEWABLE.has(model.kind) ? state.resModes[model.kind] || 'preview' : 'raw';
-  for (const b of $('resMode').querySelectorAll('button')) b.classList.toggle('active', b.dataset.mode === mode);
+  for (const b of $('resMode').querySelectorAll('button')) {
+    b.classList.toggle('active', b.dataset.mode === mode);
+    b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+  }
+  $('resModeItem').textContent = mode === 'raw' ? 'Show preview' : 'Show raw';
+  $('resModeItem').dataset.mode = mode === 'raw' ? 'preview' : 'raw';
   if (mode === 'preview') renderPreview(model, url);
   else renderRaw(model);
 }
@@ -353,10 +366,14 @@ function escapeAttr(s) {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
+// The ⋯ menu of the response pane: Preview/Raw (for narrow panes, where the switch is hidden), Copy, Save.
 function updateBodyActions() {
   const onBody = state.resTab === 'resBody';
+  const previewable = !!shown && PREVIEWABLE.has(shown.model.kind) && !$('resMode').hidden;
+  $('resModeItem').hidden = !onBody || !previewable;
   $('copyResBtn').hidden = !onBody || shownText == null;
   $('saveResBtn').hidden = !onBody || !shown;
+  $('resMenuBtn').hidden = !onBody || !shown;
 }
 
 export function saveResponseBody() {

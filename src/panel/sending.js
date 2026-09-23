@@ -4,6 +4,7 @@ import { state, current, nextId } from './state.js';
 import { $, toast } from './dom.js';
 import { renderResponse } from './response.js';
 import { renderList } from './list.js';
+import { setDetailView } from './layout.js';
 
 export function requestOf(item) {
   return { method: item.method, url: item.url.trim(), headers: parseHeaders(item.headersText), body: item.body };
@@ -24,6 +25,9 @@ export async function send() {
   state.responses.set(item.id, { pending: true, sendId });
   item.view = 'sent';
   renderResponse();
+  // Where Request and Response share the detail area, the send reveals the response
+  // (the draft stays as it is; Request is one click away).
+  setDetailView('response');
 
   let result;
   try {

@@ -8,11 +8,15 @@ import { renderEditor } from './editor.js';
 import { clamp } from './layout.js';
 import { requestOf, abandonSend } from './sending.js';
 
-export function select(id) {
+// `reveal` opens the detail screen in the narrow layout (a click on a row, a new request);
+// keyboard movement through the list keeps the current screen.
+export function select(id, { reveal = false } = {}) {
   state.selectedId = id;
+  if (reveal) state.screen = 'detail';
   renderEditor();
   renderList({ scroll: true });
 }
+
 
 export async function save() {
   const item = current();
@@ -138,7 +142,7 @@ export function newRequest(from) {
   persistSaved();
   setFilter('');
   switchTab('saved');
-  select(item.id);
+  select(item.id, { reveal: true });
   if (!from) $('url').focus();
   return item;
 }
@@ -156,7 +160,7 @@ export function tryParseCurl(text) {
 
 export function switchTab(tab) {
   state.tab = tab;
-  for (const b of $('listTabs').querySelectorAll('button')) b.classList.toggle('active', b.dataset.tab === tab);
+  $('collection').value = tab;
   renderList();
   persistSettings();
 }
@@ -171,7 +175,9 @@ export function setFilter(text) {
 
 export function setRecording(on) {
   state.recording = on;
-  $('recordBtn').classList.toggle('on', on);
-  $('recordLabel').textContent = on ? 'Recording' : 'Paused';
+  const btn = $('recordBtn');
+  btn.setAttribute('aria-pressed', String(on));
+  btn.setAttribute('aria-label', on ? 'Pause recording' : 'Resume recording');
+  btn.title = on ? 'Recording · click to pause' : 'Paused · click to resume recording';
   renderList();
 }

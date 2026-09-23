@@ -1,5 +1,5 @@
 // chrome.storage.local: the saved collection and the panel settings.
-import { state, nextId, DEFAULT_LAYOUT } from './state.js';
+import { state, nextId, DEFAULT_LAYOUT, APPEARANCES } from './state.js';
 import { toast } from './dom.js';
 
 const SAVED_KEY = 'postcat.saved';
@@ -26,6 +26,7 @@ export async function loadStorage() {
   if (['captured', 'saved'].includes(s.tab)) state.tab = s.tab;
   if (['params', 'headers', 'body'].includes(s.reqTab)) state.reqTab = s.reqTab;
   if (typeof s.filterText === 'string') state.filterText = s.filterText;
+  if (APPEARANCES.includes(s.appearance)) state.appearance = s.appearance;
   const num = (v, fallback) => (Number.isFinite(v) ? v : fallback);
   state.layout = {
     sidebarW: num(s.layout?.sidebarW, DEFAULT_LAYOUT.sidebarW),
@@ -59,8 +60,8 @@ export function persistSettings() {
 
 function writeSettings() {
   settingsTimer = 0;
-  const { xhrOnly, bulkHeaders, tab, reqTab, filterText, layout } = state;
-  return write({ [SETTINGS_KEY]: { xhrOnly, bulkHeaders, tab, reqTab, filterText, layout } });
+  const { xhrOnly, bulkHeaders, tab, reqTab, filterText, layout, appearance } = state;
+  return write({ [SETTINGS_KEY]: { xhrOnly, bulkHeaders, tab, reqTab, filterText, layout, appearance } });
 }
 
 // Debounced writes still pending when DevTools closes.

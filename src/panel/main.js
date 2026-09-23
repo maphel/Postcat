@@ -2,14 +2,14 @@
 import { headersToText, textToRows, urlToParams, prettyBody } from '../lib/index.js';
 import { state, current } from './state.js';
 import { loadStorage, persistSettings, flushPending } from './storage.js';
-import { $, toast, copyText, isTyping } from './dom.js';
+import { $, toast, copyText, isTyping, initMenus } from './dom.js';
 import { renderList } from './list.js';
 import { renderEditor, renderReqTab, afterEdit, paramsKv, headersKv } from './editor.js';
 import { renderResponse, renderResTab, setBodyMode, saveResponseBody, shownBodyText } from './response.js';
 import { send, cancelSend, isSending } from './sending.js';
 import { addCaptured, importEntries } from './capture.js';
 import { onSearch } from './search.js';
-import { initLayout } from './layout.js';
+import { initLayout, showScreen, setDetailView, setAppearance, layoutMode } from './layout.js';
 import {
   select, save, duplicate, reset, moveSelection, remove, clearCaptured, copyCurl, newRequest,
   tryParseCurl, switchTab, setFilter, setRecording,
@@ -105,6 +105,14 @@ $('curlBtn').addEventListener('click', copyCurl);
 $('resetBtn').addEventListener('click', reset);
 $('newBtn').addEventListener('click', () => newRequest());
 $('newListBtn').addEventListener('click', () => newRequest());
+$('newContextBtn').addEventListener('click', () => newRequest());
+
+// Request / Response switcher (medium and narrow layouts) and the way back to the list (narrow).
+$('viewTabs').addEventListener('click', (e) => {
+  const view = e.target.closest('button[data-view]')?.dataset.view;
+  if (view) setDetailView(view);
+});
+$('backBtn').addEventListener('click', () => showScreen('list'));
 
 // ---------- response ----------
 
@@ -115,11 +123,10 @@ $('resTabs').addEventListener('click', (e) => {
   renderResTab();
 });
 
-$('resSource').addEventListener('click', (e) => {
-  const view = e.target.closest('button[data-view]')?.dataset.view;
+$('resSource').addEventListener('change', (e) => {
   const item = current();
-  if (!view || !item) return;
-  item.view = view;
+  if (!item) return;
+  item.view = e.target.value;
   renderResponse();
 });
 
@@ -127,6 +134,7 @@ $('resMode').addEventListener('click', (e) => {
   const mode = e.target.closest('button[data-mode]')?.dataset.mode;
   if (mode) setBodyMode(mode);
 });
+$('resModeItem').addEventListener('click', (e) => setBodyMode(e.currentTarget.dataset.mode));
 
 $('copyResBtn').addEventListener('click', () => {
   const text = shownBodyText();
@@ -150,22 +158,45 @@ $('importBtn').addEventListener('click', () => {
 
 $('xhrOnly').addEventListener('change', (e) => {
   state.xhrOnly = e.target.checked;
+  $('captureBtn').setAttribute('aria-pressed', String(state.xhrOnly));
+  $('captureBtn').title = state.xhrOnly ? 'Capture options · XHR/Fetch only' : 'Capture options · all request types';
   persistSettings();
 });
 
-$('filterInput').addEventListener('input', (e) => setFilter(e.target.value));
-
-$('listTabs').addEventListener('click', (e) => {
-  const tab = e.target.closest('button[data-tab]')?.dataset.tab;
-  if (tab) switchTab(tab);
+$('appearance').addEventListener('click', (e) => {
+  const value = e.target.closest('button[data-appearance]')?.dataset.appearance;
+  if (value) setAppearance(value);
 });
+
+$('filterInput').addEventListener('input', (e) => setFilter(e.target.value));
+$('collection').addEventListener('change', (e) => switchTab(e.target.value));
 
 $('requestList').addEventListener('click', (e) => {
   const li = e.target.closest('li[data-id]');
-  if (li) select(Number(li.dataset.id));
+  if (li) select(Number(li.dataset.id), { reveal: true });
+});
+$('requestList').addEventListener('keydown', (e) => {
+  const li = e.target.closest('li[data-id]');
+  if (li && (e.key === 'Enter' || e.key === ' ')) {
+    e.preventDefault();
+    select(Number(li.dataset.id), { reveal: true });
+  }
 });
 
 // ---------- global ----------
+
+// Tab lists: Left/Right move between tabs and activate them.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const tab = e.target.closest?.('[role=tab]');
+  const list = tab?.closest('[role=tablist]');
+  if (!list) return;
+  const tabs = [...list.querySelectorAll('[role=tab]')].filter((t) => !t.hidden);
+  const next = tabs[(tabs.indexOf(tab) + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+  e.preventDefault();
+  next.focus();
+  next.click();
+});
 
 document.addEventListener('keydown', (e) => {
   const mod = e.metaKey || e.ctrlKey;
@@ -183,6 +214,7 @@ document.addEventListener('keydown', (e) => {
       moveSelection(e.key === 'ArrowDown' ? 1 : -1);
     } else if (e.key === '/') {
       e.preventDefault();
+      if (layoutMode() === 'narrow') showScreen('list');
       $('filterInput').focus();
       $('filterInput').select();
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && current() && !e.repeat) {
@@ -219,13 +251,16 @@ chrome.devtools.network.onRequestFinished.addListener((entry) => {
 
 window.addEventListener('pagehide', flushPending);
 
+// Before the stored appearance is known, follow DevTools' theme so the panel doesn't flash white.
 if (chrome.devtools.panels.themeName === 'dark') document.documentElement.classList.add('dark');
+initMenus();
 
 loadStorage().then(() => {
   const buffered = earlyEntries;
   earlyEntries = null;
   for (const entry of buffered) addCaptured(entry);
   $('xhrOnly').checked = state.xhrOnly;
+  $('captureBtn').setAttribute('aria-pressed', String(state.xhrOnly));
   initLayout();
   setRecording(true);
   setFilter(state.filterText);

@@ -5,32 +5,59 @@
   <link rel="stylesheet" href="panel.css">
 </head>
 <body>
-<div class="app">
-  <aside class="sidebar">
-    <div class="toolbar">
-      <button id="recordBtn" class="record ghost" title="Start/stop recording"><span class="dot"></span><span id="recordLabel">Recording</span></button>
-      <button id="importBtn" class="ghost" title="Add everything DevTools logged before this panel was opened">Import log</button>
-      <button id="clearBtn" class="ghost" title="Remove all captured requests">Clear</button>
-      <button id="newListBtn" class="ghost push" title="New empty request">+ New</button>
+<!-- Icons are inline SVGs (no icon library); every icon-only control carries aria-label + title. -->
+<svg hidden aria-hidden="true">
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3.5h12v17l-6-4.2-6 4.2z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+</svg>
+
+<div class="app" id="app" data-layout="wide" data-screen="detail" data-view="request">
+  <aside class="sidebar" id="sidebar" aria-label="Request list">
+    <div class="toolbar list-tools">
+      <select id="collection" class="quiet collection" aria-label="Collection" title="Captured requests or your saved collection">
+        <option value="captured" id="collectionCaptured">Captured</option>
+        <option value="saved" id="collectionSaved">Saved</option>
+      </select>
+      <span class="push"></span>
+      <button id="recordBtn" class="icon record" type="button" aria-pressed="true" aria-label="Pause recording" title="Pause recording"><span class="dot"></span></button>
+      <button id="newListBtn" class="icon new" type="button" aria-label="New request" title="New empty request"><svg><use href="#i-plus"/></svg><span class="new-label">New</span></button>
     </div>
-    <div class="toolbar">
-      <input id="filterInput" type="search" placeholder="Filter — text or /regex/" title="Press / to focus" spellcheck="false">
-      <label class="check" title="Record only XHR/fetch requests (no images, scripts, CSS)"><input type="checkbox" id="xhrOnly" checked> XHR/Fetch</label>
+    <div class="toolbar list-filter">
+      <label class="search" title="Filter by METHOD url, plain text or /regex/ · press / to focus">
+        <svg><use href="#i-search"/></svg>
+        <input id="filterInput" type="search" placeholder="Filter requests" aria-label="Filter requests: text or /regex/" spellcheck="false">
+      </label>
+      <button id="captureBtn" class="icon" type="button" popovertarget="captureMenu" aria-pressed="true" aria-label="Capture options" title="Capture options · XHR/Fetch only"><svg><use href="#i-filter"/></svg></button>
+      <div id="captureMenu" class="menu" popover role="menu" aria-label="Capture options">
+        <label class="menu-check" title="Record only XHR/fetch requests (no images, scripts, CSS)"><input type="checkbox" id="xhrOnly" checked> XHR / Fetch only</label>
+        <hr>
+        <button id="importBtn" type="button" role="menuitem" title="Add everything DevTools logged before this panel was opened">Import DevTools log</button>
+        <button id="clearBtn" type="button" role="menuitem" title="Remove all captured requests">Clear captured</button>
+        <hr>
+        <div class="menu-row">
+          <span id="appearanceLabel">Appearance</span>
+          <span id="appearance" class="segmented" role="group" aria-labelledby="appearanceLabel">
+            <button type="button" data-appearance="system" title="Follow DevTools’ theme">System</button>
+            <button type="button" data-appearance="light">Light</button>
+            <button type="button" data-appearance="dark">Dark</button>
+          </span>
+        </div>
+      </div>
     </div>
-    <div class="tabs" id="listTabs">
-      <button data-tab="captured" class="active">Captured <span id="capturedCount" class="count"></span></button>
-      <button data-tab="saved">Saved <span id="savedCount" class="count"></span></button>
-    </div>
-    <ul id="requestList" class="list"></ul>
+    <ul id="requestList" class="list" role="listbox" aria-label="Requests"></ul>
   </aside>
 
   <div class="resizer" id="sidebarResizer" title="Drag to resize · double-click to reset"></div>
 
-  <main class="main">
-    <div id="emptyState" class="empty">
-      <img src="../icons/icon128.png" alt="" width="56" height="56">
+  <main class="main" id="main">
+    <div id="emptyState" class="empty" hidden>
+      <img src="../icons/icon48.png" alt="" width="36" height="36">
       <h2>Postcat</h2>
-      <p>Requests from this tab show up on the left.<br>Pick one to edit it and send it again.</p>
+      <p>Requests from this tab show up in the list.<br>Pick one to edit it and send it again.</p>
       <dl class="shortcuts">
         <dt><kbd>⌘/Ctrl</kbd> <kbd>Enter</kbd></dt><dd>Send</dd>
         <dt><kbd>⌘/Ctrl</kbd> <kbd>S</kbd></dt><dd>Save</dd>
@@ -39,73 +66,100 @@
         <dt><kbd>⌘/Ctrl</kbd> <kbd>F</kbd></dt><dd>Search the response</dd>
         <dt><kbd>Del</kbd> <kbd>⌫</kbd></dt><dd>Delete (with undo)</dd>
       </dl>
-      <button id="newBtn" class="primary">New request</button>
+      <button id="newBtn" class="primary" type="button">New request</button>
       <p class="hint">Tip: paste a cURL command anywhere to import it.</p>
     </div>
 
     <div id="editor" class="editor" hidden>
-      <div class="urlbar">
-        <select id="method" title="HTTP method"></select>
-        <input id="url" spellcheck="false" placeholder="Enter a URL or paste a cURL command" title="Enter sends">
-        <button id="sendBtn" class="primary" title="Send (Enter in the URL field, or ⌘/Ctrl + Enter)">Send</button>
+      <!-- Context row: back to the list (narrow layout), request name or capture info, New + Save (narrow). -->
+      <div class="context" id="context">
+        <button id="backBtn" class="back narrow-only" type="button" title="Back to the request list">
+          <svg><use href="#i-back"/></svg>Requests <span id="listCount" class="count"></span>
+        </button>
+        <input id="name" class="context-name" placeholder="Request name" spellcheck="false" aria-label="Request name" title="Name in your collection">
+        <span id="info" class="info context-name"></span>
+        <button id="newContextBtn" class="icon narrow-only" type="button" aria-label="New request" title="New empty request"><svg><use href="#i-plus"/></svg></button>
       </div>
 
-      <div class="actions">
-        <input id="name" placeholder="Request name" spellcheck="false" title="Name in your collection">
-        <span id="info" class="info"></span>
-        <span class="push"></span>
-        <button id="resetBtn" class="ghost" title="Restore the request as it was recorded">↺ Reset</button>
-        <button id="saveBtn" class="ghost" title="Save to collection (⌘/Ctrl + S)">☆ Save</button>
-        <button id="dupBtn" class="ghost" title="Duplicate">⧉ Duplicate</button>
-        <button id="curlBtn" class="ghost" title="Copy as cURL">⌘ cURL</button>
-        <button id="deleteBtn" class="ghost danger" title="Delete (Del)">✕</button>
+      <div class="urlbar" id="urlbar">
+        <div class="address">
+          <select id="method" aria-label="HTTP method" title="HTTP method"></select>
+          <input id="url" spellcheck="false" placeholder="Enter a URL or paste a cURL command" aria-label="Request URL" title="Enter sends">
+        </div>
+        <button id="sendBtn" class="primary send" type="button" title="Send (Enter in the URL field, or ⌘/Ctrl + Enter)">Send</button>
+        <button id="saveBtn" class="icon" type="button" aria-label="Save to collection" title="Save to collection (⌘/Ctrl + S)"><svg><use href="#i-bookmark"/></svg></button>
+        <button id="moreBtn" class="icon" type="button" popovertarget="moreMenu" aria-label="More actions" title="More actions"><svg><use href="#i-more"/></svg></button>
+        <div id="moreMenu" class="menu" popover role="menu" aria-label="More actions">
+          <button id="resetBtn" type="button" role="menuitem" title="Restore the request as it was recorded">Reset to recorded</button>
+          <button id="dupBtn" type="button" role="menuitem" title="Duplicate this request">Duplicate</button>
+          <button id="curlBtn" type="button" role="menuitem" title="Copy as a cURL command">Copy as cURL</button>
+          <hr>
+          <button id="deleteBtn" type="button" role="menuitem" class="danger" title="Delete (Del)">Delete</button>
+        </div>
+      </div>
+
+      <!-- Request / Response switcher: shown when the panes cannot sit side by side. -->
+      <div class="switcher" id="viewTabs" role="tablist" aria-label="Detail view">
+        <button type="button" role="tab" data-view="request" id="viewReqTab" aria-selected="true" aria-controls="reqPane">Request <span id="viewEdited" class="edited-tag" hidden>edited</span></button>
+        <button type="button" role="tab" data-view="response" id="viewResTab" aria-selected="false" aria-controls="resPane">Response <span id="viewResStatus" class="status"></span></button>
       </div>
 
       <div class="split" id="split">
-        <section class="pane">
-          <div class="tabs" id="reqTabs">
-            <button data-tab="params">Params <span id="reqParamCount" class="count"></span></button>
-            <button data-tab="headers">Headers <span id="reqHeaderCount" class="count"></span></button>
-            <button data-tab="body">Body <span id="reqBodyMark" class="dotmark"></span></button>
+        <section class="pane request-pane" id="reqPane" aria-label="Request">
+          <div class="pane-head" id="reqTabs">
+            <span role="tablist" aria-label="Request fields" class="tabgroup">
+              <button type="button" role="tab" data-tab="params" aria-controls="paramsView">Params <span id="reqParamCount" class="count"></span></button>
+              <button type="button" role="tab" data-tab="headers" aria-controls="headersView">Headers <span id="reqHeaderCount" class="count"></span></button>
+              <button type="button" role="tab" data-tab="body" aria-controls="body">Body <span id="reqBodyMark" class="dotmark"></span></button>
+            </span>
             <span class="push"></span>
-            <button id="bulkBtn" class="link" title="Switch between table and plain text">Bulk edit</button>
-            <button id="beautifyBtn" class="link" title="Format JSON body">{ } Beautify</button>
+            <button id="reqMenuBtn" class="icon" type="button" popovertarget="reqMenu" aria-label="Editor options" title="Editor options"><svg><use href="#i-more"/></svg></button>
+            <div id="reqMenu" class="menu" popover role="menu" aria-label="Editor options">
+              <button id="bulkBtn" type="button" role="menuitem" title="Switch between table and plain text">Bulk edit</button>
+              <button id="beautifyBtn" type="button" role="menuitem" title="Format the JSON body">Beautify JSON</button>
+            </div>
           </div>
-          <div id="paramsView" class="kv scroll"></div>
-          <div id="headersView" class="kv scroll"></div>
-          <textarea id="headers" class="editor-text" spellcheck="false" placeholder="Name: value — one per line, # disables a line"></textarea>
-          <textarea id="body" class="editor-text" spellcheck="false" placeholder="Request body (ignored for GET/HEAD)"></textarea>
+          <div id="paramsView" class="kv scroll" role="tabpanel"></div>
+          <div id="headersView" class="kv scroll" role="tabpanel"></div>
+          <textarea id="headers" class="editor-text" spellcheck="false" aria-label="Request headers" placeholder="Name: value — one per line, # disables a line"></textarea>
+          <textarea id="body" class="editor-text" spellcheck="false" aria-label="Request body" placeholder="Request body (ignored for GET/HEAD)"></textarea>
           <div id="bodyStatus" class="status-line" hidden></div>
         </section>
 
         <div class="resizer" id="splitResizer" title="Drag to resize · double-click to reset"></div>
 
-        <section class="pane">
-          <div class="tabs" id="resTabs">
-            <button data-tab="resBody" class="active">Response</button>
-            <button data-tab="resHeaders">Headers <span id="resHeaderCount" class="count"></span></button>
-            <span class="push"></span>
-            <span id="searchCount" class="search-count" hidden></span>
-            <span id="resSource" class="segmented" hidden>
-              <button data-view="recorded" title="Response recorded from the page">Recorded</button>
-              <button data-view="sent" title="Response to your last send">Sent</button>
-            </span>
-            <span id="resMode" class="segmented" hidden>
-              <button data-mode="preview" title="Rendered preview">Preview</button>
-              <button data-mode="raw" title="Source text or hex dump">Raw</button>
+        <section class="pane response-pane" id="resPane" aria-label="Response">
+          <div class="pane-head response-head" id="resTabs">
+            <span role="tablist" aria-label="Response content" class="tabgroup">
+              <button type="button" role="tab" data-tab="resBody" aria-controls="resBodyWrap">Body</button>
+              <button type="button" role="tab" data-tab="resHeaders" aria-controls="resHeaders">Headers <span id="resHeaderCount" class="count"></span></button>
             </span>
             <span id="resStatus" class="pill"></span>
             <span id="resTime" class="meta"></span>
             <span id="resSize" class="meta"></span>
-            <button id="copyResBtn" class="link" title="Copy response body">Copy</button>
-            <button id="saveResBtn" class="link" title="Save response body as a file">Save</button>
+            <span class="push"></span>
+            <span id="searchCount" class="search-count" hidden></span>
+            <select id="resSource" class="quiet source" aria-label="Response source" title="Recorded from the page, or the response to your last send" hidden>
+              <option value="recorded">Recorded</option>
+              <option value="sent">Sent</option>
+            </select>
+            <span id="resMode" class="segmented" role="group" aria-label="Body view" hidden>
+              <button type="button" data-mode="preview" title="Rendered preview">Preview</button>
+              <button type="button" data-mode="raw" title="Source text or hex dump">Raw</button>
+            </span>
+            <button id="resMenuBtn" class="icon" type="button" popovertarget="resMenu" aria-label="Response actions" title="Response actions"><svg><use href="#i-more"/></svg></button>
+            <div id="resMenu" class="menu" popover role="menu" aria-label="Response actions">
+              <button id="resModeItem" type="button" role="menuitem">Show raw</button>
+              <button id="copyResBtn" type="button" role="menuitem" title="Copy the response body">Copy body</button>
+              <button id="saveResBtn" type="button" role="menuitem" title="Save the response body as a file">Save body as file…</button>
+            </div>
           </div>
           <div id="resRedirect" class="redirect" hidden></div>
-          <div id="resBodyWrap" class="body-wrap">
+          <div id="resBodyWrap" class="body-wrap" role="tabpanel">
             <pre id="resBody" class="output scroll"></pre>
             <div id="resPreview" class="preview" hidden></div>
           </div>
-          <div id="resHeaders" class="output headers-grid scroll" hidden></div>
+          <div id="resHeaders" class="output headers-grid scroll" role="tabpanel" hidden></div>
         </section>
       </div>
     </div>
@@ -114,7 +168,7 @@
 
 <div id="toast" class="toast" role="status">
   <span id="toastText"></span>
-  <button id="toastAction" class="link" hidden></button>
+  <button id="toastAction" class="link" type="button" hidden></button>
 </div>
 
 <script type="module" src="panel/main.js"></script>
