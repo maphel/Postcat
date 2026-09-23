@@ -10,7 +10,8 @@
     "test:real": "node test/real-devtools.js",
     "lint": "eslint .",
     "check": "npm run lint && npm test && npm run test:e2e && npm run test:real",
-    "pack": "node scripts/pack.js"
+    "pack": "node scripts/pack.js",
+    "screenshot": "node scripts/screenshot.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
@@ -22,5 +23,18 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/maphel/Postcat.git"
-  }
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "chrome-extension",
+    "devtools",
+    "http",
+    "postman",
+    "api-client"
+  ],
+  "homepage": "https://github.com/maphel/Postcat",
+  "bugs": "https://github.com/maphel/Postcat/issues",
+  "author": "Marcel Christophel"
 }

@@ -19,7 +19,8 @@ dependencies. `README.md` describes the behaviour; this file describes the code.
 | `src/panel/response.js`, `search.js`, `layout.js`, `dom.js` | Response rendering and previews, ⌘F search, resizers, DOM helpers |
 | `src/lib/` | Pure helpers (`headers`, `url`, `har`, `curl`, `json`, `body`, `format`; `index.js` re-exports). No DOM, no `chrome`. Shared by panel, worker and tests |
 | `test/` | `*.test.js` unit tests (`node:test`); `e2e.js` (Playwright, stubbed `chrome.devtools`); `real-devtools.js` (real Chrome + DevTools over CDP) |
-| `scripts/pack.js`, `.github/workflows/check.yml` | Zip for distribution; CI runs `npm run check` and uploads the zip |
+| `scripts/pack.js`, `scripts/screenshot.js` | Zip for distribution; README screenshot |
+| `.github/workflows/` | `check.yml` runs `npm run check` on push/PR; `release.yml` attaches the zip to a `v*` tag release |
 
 Module graph (top to bottom, acyclic): `main` → `actions` → `editor` / `sending` / `capture` →
 `response` / `list` → `search` / `layout` / `storage` / `kv-editor` → `dom` / `state` / `lib`.

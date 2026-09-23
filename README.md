@@ -5,6 +5,8 @@
 A small Postman inside Chrome DevTools. Postcat records the requests of the page you are
 inspecting, lets you edit and resend them, and keeps the ones you need in a collection.
 
+![Postcat panel: captured requests on the left, request editor and highlighted JSON response on the right](docs/screenshot.png)
+
 - **Capture** – every request of the inspected tab, with its response body. "Import log" adds
   what DevTools recorded before the panel was opened.
 - **Edit** – method, URL, query params (table), headers (table or bulk text), body with live
@@ -15,7 +17,8 @@ inspecting, lets you edit and resend them, and keeps the ones you need in a coll
   hex for anything else. Search with ⌘F, save the body as a file.
 - **Keep** – a saved collection with autosave and undo.
 
-Works in Chrome, Brave and other Chromium browsers (version 116 or newer).
+Works in Chrome, Brave and other Chromium browsers (version 116 or newer). Everything stays on
+your machine: no backend, no telemetry (see `SECURITY.md`).
 
 ## Install
 
@@ -88,11 +91,16 @@ npm run test:e2e    # extension in headless Chromium with a stubbed DevTools API
 npm run test:real   # real Chrome with real DevTools, driven over CDP
 npm run check       # all of the above
 npm run pack        # dist/postcat-<version>.zip
+npm run screenshot  # docs/screenshot.png for this README
 ```
 
 `manifest.json` stays in the repository root so the unpacked extension keeps its id; the code
 lives in `src/` as ES modules (`src/panel/` UI, `src/lib/` pure helpers, `src/background.js`
 service worker). `AGENTS.md` has the file map and the rules that keep the replay path safe.
+
+## Contributing
+
+Issues and pull requests are welcome; see `CONTRIBUTING.md`. Security reports: `SECURITY.md`.
 
 ## License
 
