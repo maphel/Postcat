@@ -90,8 +90,9 @@ section as release notes.
    `npm run release tag` creates the annotated tag `v<version>` for the version now in
    `package.json` and prints `git push origin v<version>`. The script refuses unless `HEAD` is
    the squashed `release: v<version>` commit and `## Unreleased` is still empty, so a tag never
-   ships changes that are not in the changelog; if `main` has moved on, prepare a new release
-   instead. Pushing the tag starts `.github/workflows/release.yml`, which
+   ships changes that are not in the changelog. If only docs or refactors landed after the release
+   commit, tag that commit by hand (`git tag -a v<version> <release-sha>`); if user-visible
+   changes landed, prepare a new release instead. Pushing the tag starts `.github/workflows/release.yml`, which
    checks that the tag matches the version, runs lint, unit and e2e tests, packs the zip and
    publishes the GitHub release with the changelog section (`npm run changelog:section
    <version>`) as notes.
