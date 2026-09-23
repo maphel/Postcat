@@ -22,8 +22,11 @@ export function renderList({ scroll = false } = {}) {
     const live = list.querySelector('input.rename');
     const draft = live ? { value: live.value, start: live.selectionStart, end: live.selectionEnd } : null;
     rebuilding = true;
-    list.replaceChildren(...(items.length ? items.map(renderListItem) : [emptyListItem()]));
-    rebuilding = false;
+    try {
+      list.replaceChildren(...(items.length ? items.map(renderListItem) : [emptyListItem()]));
+    } finally {
+      rebuilding = false; // never left true by a row render that throws
+    }
     const selected = list.querySelector('li.selected');
     // Only when the selection changed — not on every keystroke in the editor.
     if (scrollToSelected) selected?.scrollIntoView({ block: 'nearest' });
