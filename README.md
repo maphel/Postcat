@@ -5,7 +5,7 @@
 A small Postman inside Chrome DevTools. Postcat records the requests of the page you are
 inspecting, lets you edit and resend them, and keeps the ones you need in a collection.
 
-![Postcat panel: captured requests on the left, request editor and highlighted JSON response on the right](docs/screenshot.png)
+![Postcat panel docked at the bottom of DevTools: captured requests on the left, request editor and highlighted JSON response on the right](docs/screenshot.png)
 
 - **Capture** – every request of the inspected tab, with its response body. "Import log" adds
   what DevTools recorded before the panel was opened.
@@ -32,19 +32,31 @@ After updating the code, reload the extension on `chrome://extensions`, then clo
 
 ## Usage
 
-**Recording** is on by default; the **XHR/Fetch** switch limits it to API calls (turn it off to
-record images, fonts and documents). The **filter** matches `METHOD url` as plain text or `/regex/`.
+**Recording** is on by default (the dot next to the collection selector pauses it). The capture
+options menu (filter icon) holds the **XHR / Fetch only** switch (turn it off to record images,
+fonts and documents), **Import DevTools log**, **Clear captured** and the **Appearance** setting
+(Light, Dark or System, which follows DevTools' theme). The **filter** matches `METHOD url` as
+plain text or `/regex/`. The selector above the list switches between **Captured** and **Saved**.
 
-**Editing** a captured request marks it with ● in the list; **Reset** restores the recorded
-version. **Save** copies it into the collection (tab "Saved"), where changes are saved automatically.
+**Editing** a captured request marks it with ● in the list; **Reset to recorded** (in the ⋯ menu
+next to Send, together with Duplicate, Copy as cURL and Delete) restores the recorded version.
+**Save** (bookmark icon) copies it into the collection, where changes are saved automatically.
+The ⋯ menu of the request pane offers **Bulk edit** for headers and **Beautify JSON** for the body.
 
 **Sending** shows the status, timing and size. While a request runs, the button turns into
 **Cancel**. Failures explain the cause (unreachable host, timeout, invalid header, offline).
-For captured requests, **Recorded / Sent** switches between the original and the replay.
+For captured requests, **Recorded / Sent** selects the source of the response; **Body** and
+**Headers** are tabs in the response header and follow the selected source.
 
 **Responses** are shown by type; **Preview / Raw** switches between the rendered view and the
-source or hex dump. The type is taken from the `Content-Type` header, or sniffed from the first
-bytes when the header is missing or generic.
+source or hex dump (in a narrow response pane the switch sits in the response ⋯ menu, together
+with **Copy body** and **Save body as file**). The type is taken from the `Content-Type` header,
+or sniffed from the first bytes when the header is missing or generic.
+
+**Docking.** The layout follows the width of the panel: wide panels show the list, the request
+editor and the response side by side; medium ones keep the list and switch between **Request**
+and **Response**; narrow ones (DevTools docked to the side) show either the list or the details,
+with **Requests** leading back to the list. Sending in a switched layout reveals the response.
 
 | Keys | Action |
 |---|---|

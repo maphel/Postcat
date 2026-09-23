@@ -12,12 +12,12 @@ dependencies. `README.md` describes the behaviour; this file describes the code.
 | `icons/` | Extension icons (16/32/48/128 px) referenced by the manifest |
 | `src/background.js` | Module service worker: replays requests (`postcat:send` / `postcat:cancel` messages), header rules via declarativeNetRequest |
 | `src/devtools.html`, `src/devtools.js` | DevTools page (only loads the script); registers the panel and forwards DevTools' search bar to `window.postcatSearch` |
-| `src/panel.html`, `src/panel.css` | Panel markup and styles; colours only via custom properties in `:root` / `:root.dark` |
+| `src/panel.html`, `src/panel.css` | Panel markup and styles; colours only via custom properties in `:root` / `:root.dark`. Three layouts (wide / medium / narrow) keyed off `data-layout`, `data-screen` and `data-view` on `.app`; menus are `[popover]` elements |
 | `src/panel/main.js`, `actions.js` | Entry point: event wiring, shortcuts, boot; user actions that change the selection or which items exist |
 | `src/panel/state.js`, `storage.js` | Single `state` object and selectors; `chrome.storage.local` with validation and debounced writes |
 | `src/panel/capture.js`, `sending.js` | HAR entries → items (dedupe by occurrence, import); `send` / `cancelSend` / `abandonSend` |
 | `src/panel/list.js`, `editor.js`, `kv-editor.js` | Request list (rAF-batched), editor tabs, key/value table |
-| `src/panel/response.js`, `search.js`, `layout.js`, `dom.js` | Response rendering and previews, ⌘F search, resizers, DOM helpers |
+| `src/panel/response.js`, `search.js`, `layout.js`, `dom.js` | Response rendering and previews, ⌘F search, layout modes from the panel width (ResizeObserver), narrow list/detail screens, Request/Response switcher, appearance, resizers; DOM helpers, toast, popover menus |
 | `src/lib/` | Pure helpers (`headers`, `url`, `har`, `curl`, `json`, `body`, `format`; `index.js` re-exports). No DOM, no `chrome`. Shared by panel, worker and tests |
 | `test/*.test.js` | Unit tests (`node:test`): `lib.test.js` covers `src/lib`, `regressions.test.js` pins fixed bugs |
 | `test/e2e.js`, `test/real-devtools.js` | Playwright e2e against the stubbed `chrome.devtools`; real Chrome + DevTools over CDP |

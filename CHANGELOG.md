@@ -7,6 +7,13 @@ All notable changes to Postcat are listed here. The format is based on
 
 <!-- Entries go under ### Added / ### Changed / ### Fixed / ### Removed; add only the subsections you need. -->
 
+### Changed
+- Compact, docking-aware layout: the panel adapts to its width (list, editor and response side by
+  side; list plus a Request / Response switcher; or list and details taking the full width with a
+  "Requests" button), the response header has direct Body / Headers tabs next to the Recorded / Sent
+  source, secondary actions moved into the ⋯ and capture-options menus, and the appearance can be
+  set to Light, Dark or System.
+
 ## 0.1.0 — 2026-09-23
 
 First public release.
