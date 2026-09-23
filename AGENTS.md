@@ -18,7 +18,7 @@ dependencies. `README.md` describes the behaviour; this file describes the code.
 | `src/panel/list.js`, `editor.js`, `kv-editor.js` | Request list (rAF-batched), editor tabs, key/value table |
 | `src/panel/response.js`, `search.js`, `layout.js`, `dom.js` | Response rendering and previews, ⌘F search, resizers, DOM helpers |
 | `src/lib/` | Pure helpers (`headers`, `url`, `har`, `curl`, `json`, `body`, `format`; `index.js` re-exports). No DOM, no `chrome`. Shared by panel, worker and tests |
-| `test/` | `*.test.js` unit tests (`node:test`); `e2e.js` (Playwright, stubbed `chrome.devtools`); `real-devtools.js` (real Chrome + DevTools over CDP) |
+| `test/` | `*.test.js` unit tests (`node:test`); `e2e.js` (Playwright, stubbed `chrome.devtools`); `real-devtools.js` (real Chrome + DevTools over CDP); `harness.js` builds and launches the extension for e2e and the screenshot script |
 | `scripts/pack.js`, `scripts/screenshot.js` | Zip for distribution; README screenshot |
 | `.github/workflows/` | `check.yml` runs `npm run check` on push/PR; `release.yml` attaches the zip to a `v*` tag release |
 
