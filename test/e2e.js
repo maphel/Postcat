@@ -1,8 +1,12 @@
 // End-to-end test: the service worker's replay path and the panel UI, driven by Playwright.
 // The panel runs in the harness page (test/harness.js) under a stubbed chrome.devtools.
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 import assert from 'node:assert';
 import { buildExtension, launch, openPanel, harEntry, waitForRows, waitForSendDone } from './harness.js';
+
+const MANIFEST_VERSION = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'manifest.json'), 'utf8')).version;
 
 const PNG_1x1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 const MEDIA = {
@@ -916,6 +920,53 @@ function ok(name, condition, detail) {
   await page.click('#captureBtn');
   await page.click('#appearance button[data-appearance=system]');
   check('system appearance follows DevTools', await page.evaluate(() => document.documentElement.classList.contains('dark')), true);
+
+  // Version line at the bottom of the Options menu. The harness copy is unstamped (harness.js), so
+  // only the manifest version shows; the missing build-info.js is caught, not reported.
+  const versionLine = (p) => p.evaluate(() => [document.getElementById('versionLine').textContent, document.getElementById('versionLine').title]);
+  await page.click('#captureBtn');
+  await settle(() => document.getElementById('versionLine').checkVisibility());
+  check('version line without a stamp shows only the version', [await page.isVisible('#versionLine'), ...await versionLine(page)], [true, `Postcat ${MANIFEST_VERSION}`, '']);
+  check('version line is not a menu item', await page.evaluate(() => document.getElementById('versionLine').matches('[role], button, a, [tabindex]')), false);
+  // Keyboard: opening focused the first item; ArrowUp wraps to the last item (the Dark radio), never the footer.
+  await settle(() => document.activeElement?.id === 'xhrOnly');
+  await page.keyboard.press('ArrowUp');
+  check('ArrowUp in the Options menu wraps to the last item, not the version line', await page.evaluate(() => document.activeElement.dataset.appearance), 'dark');
+  const visited = [];
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press('ArrowDown');
+    visited.push(await page.evaluate(() => document.activeElement.id || document.activeElement.dataset.appearance));
+  }
+  check('ArrowDown cycles the items and skips the version line', [visited.includes('versionLine'), visited.includes('xhrOnly'), visited.includes('importBtn')], [false, true, true]);
+  await page.keyboard.press('Escape');
+  const { page: plain, consoleErrors: plainConsole } = await openPanel(ctx, id, { width: 1300, height: 600 });
+  await plain.waitForFunction((v) => document.getElementById('versionLine').textContent === `Postcat ${v}`, MANIFEST_VERSION);
+  await plain.waitForLoadState('networkidle');
+  check('a missing build stamp logs no console error', plainConsole, []);
+  await plain.close();
+  // The package lookup degrades to the plain version line when the API is missing, hands back
+  // nothing, or throws: no page error, no console error.
+  for (const [name, init] of [
+    ['API missing', 'chrome.runtime.getPackageDirectoryEntry = undefined;'],
+    ['callback without an entry', 'chrome.runtime.getPackageDirectoryEntry = (cb) => setTimeout(() => cb(undefined), 0);'],
+    ['API throws', 'chrome.runtime.getPackageDirectoryEntry = () => { throw new Error("boom"); };'],
+  ]) {
+    const { page: broken, errors: brokenErrors, consoleErrors: brokenConsole } = await openPanel(ctx, id, { width: 1300, height: 600, init });
+    await broken.waitForFunction((v) => document.getElementById('versionLine').textContent === `Postcat ${v}`, MANIFEST_VERSION);
+    await broken.waitForLoadState('networkidle');
+    check(`build lookup with ${name}: plain version line, no errors`, [await broken.textContent('#versionLine'), brokenErrors, brokenConsole], [`Postcat ${MANIFEST_VERSION}`, [], []]);
+    await broken.close();
+  }
+  // With `npm run stamp` (src/build-info.js in the loaded folder): commit, branch and local HH:MM of the stamp, the full commit in the tooltip.
+  const stamp = { commit: 'e176965abcdef0123456789abcdef0123456789a', short: 'e176965', branch: 'feat/foo', time: '2026-09-23T17:42:00.000Z' };
+  fs.writeFileSync(path.join(dir, 'src', 'build-info.js'), `export default ${JSON.stringify(stamp)};\n`);
+  const { page: stamped, errors: stampedErrors } = await openPanel(ctx, id, { width: 1300, height: 600 });
+  await stamped.waitForFunction(() => document.getElementById('versionLine').textContent.includes('·'));
+  const hhmm = new Date(stamp.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }); // the browser's local time; same zone as this process
+  check('version line with a stamp', await versionLine(stamped), [`Postcat ${MANIFEST_VERSION} · e176965 · feat/foo · ${hhmm}`, `Commit ${stamp.commit} · stamped ${stamp.time}`]);
+  check('stamped panel has no uncaught errors', stampedErrors, []);
+  await stamped.close();
+  fs.rmSync(path.join(dir, 'src', 'build-info.js'));
 
   // Big counts: shown in the default sidebar; in the minimum one they drop rather than clip, the labels stay.
   await page.evaluate(() => { for (let i = 0; i < 1000; i++) __emit(harEntry({ started: `many-${i}`, url: `http://localhost:8765/many/${i}`, mime: '' })); });

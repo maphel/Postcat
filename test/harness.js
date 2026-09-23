@@ -16,6 +16,8 @@ export function buildExtension() {
   fs.copyFileSync(path.join(root, 'manifest.json'), path.join(dir, 'manifest.json'));
   fs.cpSync(path.join(root, 'src'), path.join(dir, 'src'), { recursive: true });
   fs.cpSync(path.join(root, 'icons'), path.join(dir, 'icons'), { recursive: true });
+  // A stamped checkout (`npm run stamp`) must not leak into the tests: the copy starts unstamped.
+  fs.rmSync(path.join(dir, 'src', 'build-info.js'), { force: true });
   fs.copyFileSync(path.join(root, 'test', 'devtools-stub.js'), path.join(dir, 'src', 'stub.js'));
   fs.writeFileSync(path.join(dir, 'src', 'harness.html'), fs.readFileSync(path.join(root, 'src', 'panel.html'), 'utf8')
     .replace('<script type="module" src="panel/main.js"></script>', '<script src="stub.js"></script><script type="module" src="panel/main.js"></script>'));
@@ -37,17 +39,21 @@ export async function launch(dir) {
   return { ctx, sw, id: sw.url().split('/')[2] };
 }
 
-// Opens the harness page in a new tab and collects its uncaught errors. `harEntry` is installed as a
-// page global before the panel boots, so page.evaluate() callbacks can call it under the same name
-// as the import and hand the result to __emit().
-export async function openPanel(ctx, id, { width, height }) {
+// Opens the harness page in a new tab and collects its uncaught errors (`errors`) and console errors
+// (`consoleErrors`, including failed resource loads). `harEntry` is installed as a page global before
+// the panel boots, so page.evaluate() callbacks can call it under the same name as the import and
+// hand the result to __emit().
+// `init` (optional JS source) runs before the panel boots, e.g. to break a chrome API on purpose.
+export async function openPanel(ctx, id, { width, height, init = '' }) {
   const page = await ctx.newPage();
   const errors = [];
+  const consoleErrors = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
   await page.setViewportSize({ width, height });
-  await page.addInitScript(`window.harEntry = ${harEntry};`);
+  await page.addInitScript(`window.harEntry = ${harEntry};\n${init}`);
   await page.goto(`chrome-extension://${id}/src/harness.html`);
-  return { page, errors };
+  return { page, errors, consoleErrors };
 }
 
 // The list renders on the next animation frame (list.js): resolves once it shows exactly `n` rows.

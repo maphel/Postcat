@@ -16,7 +16,8 @@ fs.mkdirSync(dist, { recursive: true });
 const out = path.join(dist, `postcat-${manifest.version}.zip`);
 fs.rmSync(out, { force: true });
 
-// zip(1) is available on macOS, Linux and GitHub's runners; -X drops OS metadata.
-execFileSync('zip', ['-r', '-X', '-q', out, 'manifest.json', 'src', 'icons', '-x', '*.DS_Store'], { cwd: root, stdio: 'inherit' });
+// zip(1) is available on macOS, Linux and GitHub's runners; -X drops OS metadata. The dev build
+// stamp (`npm run stamp`) never ships: a release shows only its version.
+execFileSync('zip', ['-r', '-X', '-q', out, 'manifest.json', 'src', 'icons', '-x', '*.DS_Store', '-x', 'src/build-info.js'], { cwd: root, stdio: 'inherit' });
 const size = fs.statSync(out).size;
 console.log(`${path.relative(root, out)} (${(size / 1024).toFixed(0)} KB)`);

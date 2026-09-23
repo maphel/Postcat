@@ -14,9 +14,14 @@ npx playwright install chromium   # for the browser suites
 npm run check                     # lint, unit, e2e, real DevTools
 ```
 
+`npm test` needs `zip` and `unzip` on the `PATH` (the pack test builds the zip and lists it) and
+rewrites `dist/` on every run.
+
 Load the repository folder as an unpacked extension (`chrome://extensions` → Developer mode →
 Load unpacked) to try changes in a real browser. Reload the extension after edits, then close
-and reopen DevTools.
+and reopen DevTools. `npm run stamp` writes a git-ignored `src/build-info.js`, and the version
+line at the bottom of the panel's options menu then shows the commit, branch and stamp time, so
+you can see that the reload picked up your branch. The stamp is never packed into a release.
 
 ## Branching
 
@@ -27,7 +32,9 @@ so it follows the commit convention below). The protection cannot stop the repos
 convention, not by GitHub. Branch from `main` as `<type>/<topic>`, e.g. `fix/curl-quoted-body`
 or `docs/shortcut-table`, with one of the types `feat`, `fix`, `docs`, `test`, `chore`,
 `refactor`, `release` (the last one is used by the release script only). Open an issue first
-for anything beyond a bug fix or a docs change, so we can agree on the scope.
+for anything beyond a bug fix or a docs change, so we can agree on the scope. While the branch
+is loaded as an unpacked extension, `npm run stamp` (see Setup) makes the panel show which
+commit is running.
 
 ## Commits
 
@@ -69,8 +76,10 @@ all three); `scripts/pack.js` refuses to build when `manifest.json` and `package
 
 ## Releasing
 
-**When.** Whenever `## Unreleased` has user-visible entries and CI on `main` is green. There is
-no fixed cadence, but a reported bug should not sit fixed-but-unreleased for long.
+**When.** After every merged `feat` or `fix` PR, as soon as CI on `main` is green, unless the
+maintainer explicitly decides to batch several PRs into one release. The version shown in the
+panel's options menu should move with the product; a reported bug must not sit
+fixed-but-unreleased. Docs, tests and refactors do not trigger a release on their own.
 
 **What.** The GitHub release for tag `v<version>` with `postcat-<version>.zip`, built from
 `manifest.json`, `src/` and `icons/` only (`npm run pack`), and the matching `CHANGELOG.md`
