@@ -9,6 +9,10 @@ inspecting, lets you edit and resend them, and keeps the ones you need in a coll
 
 ![Postcat panel docked at the bottom of DevTools: captured requests on the left, request editor and highlighted JSON response on the right](docs/screenshot.png)
 
+<img src="docs/screenshot-side.png" alt="Postcat docked to the side of DevTools: the narrow layout shows one request at a time, here the JSON response to a replayed PATCH, with a Requests button leading back to the list" width="380" height="480">
+
+The same two views in the dark appearance: [bottom](docs/screenshot-dark.png), [side](docs/screenshot-side-dark.png).
+
 - **Capture** – every request of the inspected tab, with its response body. "Import log" adds
   what DevTools recorded before the panel was opened.
 - **Edit** – method, URL, query params (table), headers (table or bulk text), body with live
@@ -116,7 +120,7 @@ npm run check       # all of the above
 npm run pack        # dist/postcat-<version>.zip
 npm run stamp       # src/build-info.js (git-ignored): the panel's version line names the commit, branch and time
 npm run release <version>  # release branch: version bump + changelog; `npm run release tag` after the merge
-npm run screenshot  # docs/screenshot.png for this README
+npm run screenshot  # docs/screenshot*.png for this README (bottom and side docking, light and dark)
 ```
 
 When testing a branch as an unpacked extension, `npm run stamp` before reloading it turns the
