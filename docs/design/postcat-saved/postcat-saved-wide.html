@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="en" data-canvas="wide">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Postcat · Saved area · 1024 × 320, bottom dock</title>
+<style>
+/* ---------- frame (outside the panel; not part of the design) ---------- */
+html, body { margin: 0; background: #d9dde3; color: #272a30; font: 12px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.frame { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px; }
+.frame-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 11px; color: #4b525c; width: 1024px; }
+.frame-bar strong { font-weight: 500; color: #272a30; }
+.frame-bar label { display: inline-flex; align-items: center; gap: 4px; }
+.frame-bar select { font: inherit; font-size: 11px; }
+.frame-bar .seg { display: inline-flex; border: 1px solid #b8bec8; border-radius: 4px; overflow: hidden; }
+.frame-bar .seg button { font: inherit; font-size: 11px; border: 0; background: #fff; color: #4b525c; padding: 2px 7px; cursor: pointer; }
+.frame-bar .seg button + button { border-left: 1px solid #b8bec8; }
+.frame-bar .seg button[aria-checked=true] { background: #1767ce; color: #fff; }
+.frame-note { font-size: 11px; color: #4b525c; max-width: 1024px; margin: 0; }
+
+/* ---------- panel tokens: identical to src/panel.css on feat/compact-docking-layout ---------- */
+.pc {
+  color-scheme: light;
+  --bg: #ffffff; --bg-alt: #f7f8fa; --bg-bar: #f0f2f5; --bg-field: #ffffff; --bg-hover: #e9edf2; --bg-selected: #e8f0fc;
+  --border: #dfe3e9; --border-strong: #c9ced6; --text: #272a30; --muted: #606975;
+  --accent: #1767ce; --accent-text: #ffffff; --ok: #237447; --warn: #92581e; --err: #ba3447; --record: #d93025;
+  --j-key: #881391; --j-str: #c41a16; --j-num: #1c00cf; --toast-link: #9bbfff;
+  --shadow: 0 5px 20px rgba(21, 34, 58, .16);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sidebar-w: 214px; --req-w: 45%;
+}
+.pc.dark {
+  color-scheme: dark;
+  --bg: #202124; --bg-alt: #24262a; --bg-bar: #292b30; --bg-field: #292c31; --bg-hover: #353840; --bg-selected: #33425a;
+  --border: #3b3e45; --border-strong: #4d5159; --text: #e8eaed; --muted: #b1b8c3;
+  --accent: #9bbfff; --accent-text: #172b49; --ok: #91cba7; --warn: #deb087; --err: #ef8c97; --record: #ef8c97;
+  --j-key: #5db0d7; --j-str: #f29766; --j-num: #9980ff; --toast-link: #1767ce;
+  --shadow: 0 5px 20px rgba(0, 0, 0, .5);
+}
+
+/* ---------- panel: the canvas is the DevTools panel; everything inside is the design ---------- */
+.pc { position: relative; width: 1024px; height: 320px; background: var(--bg); color: var(--text); font: 12px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow: hidden; border: 1px solid #b8bec8; box-sizing: content-box; }
+.pc * { box-sizing: border-box; }
+.pc [hidden] { display: none !important; }
+.pc button, .pc input, .pc select, .pc textarea { font: inherit; color: inherit; }
+.pc svg { display: block; width: 14px; height: 14px; flex: 0 0 14px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+.pc button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex-shrink: 0; background: transparent; border: 1px solid transparent; border-radius: 4px; min-height: 26px; padding: 3px 7px; line-height: 18px; white-space: nowrap; cursor: pointer; color: var(--text); }
+.pc button:hover:not(:disabled) { background: var(--bg-hover); }
+.pc button:disabled { opacity: .45; cursor: default; }
+.pc button:focus-visible, .pc input:focus-visible, .pc select:focus-visible, .pc textarea:focus-visible, .pc [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pc button.icon { width: 26px; padding: 5px; }
+.pc button.icon[aria-pressed=true], .pc button.icon.on { color: var(--accent); background: var(--bg-selected); }
+.pc button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 500; padding: 3px 10px; }
+.pc button.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(.95); }
+.pc button.link { border: none; padding: 3px 6px; color: var(--muted); min-height: 24px; }
+.pc button.link:hover:not(:disabled) { color: var(--accent); background: none; }
+.pc button.secondary { background: var(--bg-alt); border-color: var(--border-strong); font-size: 11px; }
+
+.pc input, .pc select, .pc textarea { background: var(--bg-field); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; min-width: 0; min-height: 24px; }
+.pc input:focus, .pc select:focus, .pc textarea:focus { outline: none; border-color: var(--accent); }
+.pc input::placeholder, .pc textarea::placeholder { color: var(--muted); opacity: 1; }
+.pc select { font-size: 11px; padding: 2px 5px; }
+.pc select option { background: var(--bg); color: var(--text); }
+.pc select.quiet { border-color: transparent; background: transparent; color: var(--muted); }
+.pc select.quiet:hover { background: var(--bg-hover); color: var(--text); }
+.pc input[type=checkbox] { width: 12px; height: 12px; min-height: 0; accent-color: var(--accent); margin: 0; vertical-align: middle; }
+.pc kbd { display: inline-block; font: 11px var(--mono); border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--bg-alt); }
+
+.pc .push { margin-left: auto; }
+.pc .count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.pc .scroll { overflow: auto; min-height: 0; overscroll-behavior: contain; scrollbar-width: thin; }
+
+/* menus: fixed inside the canvas (the real panel uses the Popover API, positioned by dom.js) */
+.pc .menu { position: absolute; z-index: 20; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 7px; box-shadow: var(--shadow); padding: 4px; min-width: 170px; max-width: calc(100% - 8px); }
+.pc .menu > button { display: flex; width: 100%; justify-content: flex-start; text-align: left; font-size: 11px; padding: 4px 8px; }
+.pc .menu > button.danger:hover:not(:disabled) { color: var(--err); }
+.pc .menu hr { border: 0; height: 1px; background: var(--border); margin: 3px; }
+.pc .menu .kbd { margin-left: auto; color: var(--muted); font-size: 10px; padding-left: 14px; }
+
+/* app shell */
+.pc .app { display: grid; grid-template-columns: min(var(--sidebar-w), 45%) 5px minmax(0, 1fr); height: 100%; overflow: hidden; }
+.pc .app[data-layout=narrow] { display: flex; }
+.pc .app[data-layout=narrow] > .sidebar, .pc .app[data-layout=narrow] > .main { width: 100%; }
+.pc .app[data-layout=narrow] .resizer { display: none; }
+.pc .app[data-layout=narrow][data-screen=list] > .main { display: none; }
+.pc .app[data-layout=narrow][data-screen=detail] > .sidebar { display: none; }
+.pc .resizer { cursor: col-resize; background: linear-gradient(to right, transparent 2px, var(--border) 2px, var(--border) 3px, transparent 3px); }
+
+/* sidebar */
+.pc .sidebar { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg-alt); }
+.pc .toolbar { display: flex; align-items: center; gap: 3px; padding: 3px 6px; min-height: 34px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.pc .list-filter { min-height: 32px; gap: 4px; }
+.pc .list-tools { padding-top: 0; padding-bottom: 0; }
+.pc .collection { display: flex; align-items: stretch; gap: 8px; }
+.pc .collection > [role=tab] { align-self: stretch; min-height: 34px; font-weight: 500; }
+.pc .collection > [role=tab] .count { font-weight: 400; }
+.pc .app[data-layout=narrow] .toolbar { padding-left: 9px; padding-right: 9px; }
+.pc .app[data-layout=narrow] .collection > [role=tab] { font-size: 12px; }
+.pc .new .new-label { display: none; }
+.pc .app[data-layout=narrow] .new { width: auto; padding: 3px 8px; }
+.pc .app[data-layout=narrow] .new .new-label { display: inline; }
+.pc .record .dot { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--record); }
+.pc .search { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0; color: var(--muted); }
+.pc .search svg { width: 12px; height: 12px; flex-basis: 12px; }
+.pc .search input { width: 100%; min-width: 0; height: 24px; padding: 3px 0; border: 0; background: transparent; font-size: 11px; color: var(--text); }
+
+/* list: request rows on the 28 px grid (31 px narrow); group headers share the grid */
+.pc .list { list-style: none; margin: 0; padding: 3px 0; overflow-y: auto; flex: 1; min-height: 0; overscroll-behavior: contain; scrollbar-width: thin; }
+.pc .list li[data-id], .pc .list li.group { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 6px; align-items: center; min-height: 28px; padding: 3px 8px; font-size: 11px; border-left: 2px solid transparent; cursor: pointer; }
+.pc .app[data-layout=narrow] .list li[data-id], .pc .app[data-layout=narrow] .list li.group { min-height: 31px; padding-left: 11px; padding-right: 11px; }
+.pc .list li[data-id]:hover, .pc .list li.group:hover { background: var(--bg-hover); }
+.pc .list li.selected, .pc .list li.selected:hover { background: var(--bg-selected); border-left-color: var(--accent); }
+.pc .list li:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pc .list .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc .list .status { text-align: right; min-width: 24px; }
+/* Rows inside a group are indented by one step (the chevron column keeps the method aligned). */
+.pc .list li[data-id] { grid-template-columns: 40px minmax(0, 1fr) auto; padding-left: 16px; }
+.pc .app[data-layout=narrow] .list li[data-id] { padding-left: 19px; }
+/* Group header: chevron in the method column, name + count, active set chip in the status column. */
+.pc .list li.group .chev { display: inline-flex; align-items: center; color: var(--muted); }
+.pc .list li.group .chev svg { width: 12px; height: 12px; flex-basis: 12px; transition: transform .1s; }
+.pc .list li.group[aria-expanded=true] .chev svg { transform: rotate(90deg); }
+.pc .list li.group .gname { font-weight: 500; }
+.pc .list li.group .gsub { display: block; font-size: 10px; line-height: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc .list li.group.renamed { min-height: 32px; padding-top: 2px; padding-bottom: 3px; }
+.pc .app[data-layout=narrow] .list li.group.renamed { min-height: 36px; }
+.pc .chip { display: inline-block; font: 500 10px/14px var(--mono); color: var(--muted); border: 1px solid var(--border-strong); border-radius: 3px; padding: 0 4px; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+.pc .list li.selected .chip { border-color: var(--accent); color: var(--accent); }
+.pc .list li.empty { cursor: default; color: var(--muted); text-align: center; padding: 24px 16px; font-size: 11px; }
+.pc .list li.empty strong { display: block; color: var(--text); font-weight: 500; font-size: 12px; margin-bottom: 2px; }
+.pc .list li.empty kbd { font-size: 10px; padding: 0 4px; }
+.pc .list .rename { width: 100%; min-height: 20px; padding: 1px 4px; font-size: 11px; }
+.pc .edited { color: var(--warn); font-size: 8px; margin-right: 4px; vertical-align: 1px; }
+.pc .method { font: 500 11px var(--mono); }
+.pc .m-get { color: var(--ok); }
+.pc .m-post, .pc .m-put, .pc .m-patch { color: var(--warn); }
+.pc .m-delete { color: var(--err); }
+.pc .status { font: 500 11px var(--mono); font-variant-numeric: tabular-nums; }
+.pc .s-ok { color: var(--ok); }
+.pc .s-client, .pc .s-err { color: var(--err); }
+.pc .s-none { color: var(--muted); font-weight: 400; }
+
+/* main */
+.pc .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
+.pc .empty { margin: auto; text-align: center; color: var(--muted); padding: 16px; font-size: 11px; }
+.pc .empty h2 { color: var(--text); margin: 6px 0 2px; font-size: 13px; font-weight: 500; }
+.pc .empty p { margin: 0 0 10px; }
+.pc .empty .actions { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.pc .empty code { font: 11px var(--mono); }
+.pc .editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.pc .context { display: none; align-items: center; gap: 6px; padding: 2px 6px; min-height: 32px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.pc .app[data-layout=narrow] .context { display: flex; }
+.pc .context .back { padding-left: 2px; gap: 2px; }
+.pc .context-name { flex: 1; min-width: 0; font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pc .context-name .gsub { font-weight: 400; color: var(--muted); }
+
+.pc .urlbar { display: flex; align-items: center; gap: 5px; padding: 5px 8px; min-height: 39px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.pc .app[data-layout=narrow] .urlbar { padding: 5px 6px; gap: 4px; }
+.pc .address { flex: 1; min-width: 0; display: flex; align-items: center; height: 28px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg-field); }
+.pc .address:focus-within { border-color: var(--accent); }
+.pc .address select { height: 26px; min-height: 26px; flex: 0 0 auto; max-width: 45%; border: 0; border-right: 1px solid var(--border); border-radius: 4px 0 0 4px; background: transparent; font: 500 11px var(--mono); padding: 3px 4px; }
+.pc .address input { width: 100%; min-width: 0; height: 26px; min-height: 0; border: 0; border-radius: 0 4px 4px 0; background: transparent; padding: 4px 7px; font: 11px/1.5 var(--mono); }
+.pc .address :focus { outline: none; }
+.pc .send { height: 28px; min-width: 52px; }
+.pc .app[data-layout=narrow] .send { min-width: 48px; padding: 3px 7px; }
+.pc .save.saved { color: var(--accent); }
+.pc .save.saved svg { fill: currentColor; }
+
+/* group detail heading: the detail's first row, same height as the URL bar it replaces */
+.pc .group-head { display: flex; align-items: baseline; gap: 8px; padding: 5px 10px; min-height: 39px; border-bottom: 1px solid var(--border); flex-shrink: 0; white-space: nowrap; overflow: hidden; }
+.pc .app[data-layout=narrow] .group-head { display: none; }
+.pc .group-head h2 { margin: 0; font-size: 12px; font-weight: 500; align-self: center; }
+.pc .group-head .gsub { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; align-self: center; }
+
+.pc .switcher { display: none; align-items: center; gap: 14px; padding: 0 10px; min-height: 30px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.pc .app[data-layout=narrow] .switcher { display: flex; }
+.pc .split { display: grid; grid-template-columns: var(--req-w) 5px minmax(0, 1fr); flex: 1; min-height: 0; }
+.pc .app[data-layout=narrow] .split { display: flex; flex-direction: column; }
+.pc .app[data-layout=narrow][data-view=request] .response-pane { display: none; }
+.pc .app[data-layout=narrow][data-view=response] .request-pane { display: none; }
+.pc .pane { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; container-type: inline-size; }
+.pc .pane-head { display: flex; align-items: center; gap: 8px; padding: 0 9px; min-height: 30px; border-bottom: 1px solid var(--border); white-space: nowrap; flex-shrink: 0; overflow: hidden; }
+.pc .tabgroup { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.pc .switcher > [role=tab], .pc .pane-head [role=tab], .pc .collection > [role=tab] { min-height: 30px; padding: 4px 0; border: 0; border-bottom: 2px solid transparent; border-radius: 0; font-size: 11px; color: var(--muted); gap: 4px; }
+.pc .switcher > [role=tab] { font-size: 12px; }
+.pc .switcher > [role=tab]:hover, .pc .pane-head [role=tab]:hover, .pc .collection > [role=tab]:hover { background: transparent; color: var(--text); }
+.pc .switcher > [role=tab][aria-selected=true], .pc .pane-head [role=tab][aria-selected=true], .pc .collection > [role=tab][aria-selected=true] { border-bottom-color: var(--accent); color: var(--text); }
+.pc .pane-head .flush { margin-right: -4px; }
+.pc .pane-head .rename { width: 64px; min-height: 22px; padding: 1px 4px; font-size: 11px; }
+.pc .response-head { gap: 6px; }
+.pc .response-head .tabgroup { margin-right: 2px; }
+.pc .source, .pc .source-label { padding: 1px 4px; border: 1px solid transparent; font-size: 11px; flex-shrink: 0; }
+.pc .source { width: auto; max-width: 120px; field-sizing: content; }
+.pc .source-label { color: var(--muted); }
+.pc .ctx { color: var(--muted); font-size: 11px; padding: 3px 6px; gap: 4px; }
+.pc .ctx:hover:not(:disabled) { color: var(--text); }
+.pc .ctx .label { overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+@container (max-width: 269px) { .pc .ctx { width: 26px; padding: 5px; } .pc .ctx .label { display: none; } }
+/* The Variables tab's action names its target (the group); it needs more room than a verb, so it folds earlier. */
+@container (max-width: 339px) { .pc .ctx.group-link { width: 26px; padding: 5px; } .pc .ctx.group-link .label { display: none; } }
+/* Set tabs: the selected tab is the active set; the + adds one; the tab's one action is Duplicate set. */
+.pc .sets [role=tab] { font: 500 11px var(--mono); }
+.pc .sets .add-set { width: 22px; min-height: 22px; padding: 3px; color: var(--muted); }
+.pc .dotmark { color: var(--accent); font-size: 8px; vertical-align: 1px; }
+.pc .dotmark.warn { color: var(--warn); }
+
+.pc .editor-text, .pc .output { flex: 1; margin: 0; border: none; border-radius: 0; padding: 8px 10px; font: 11px/1.6 var(--mono); resize: none; min-height: 0; background: transparent; color: var(--text); }
+.pc .output { white-space: pre-wrap; word-break: break-word; overflow: auto; }
+.pc .output.muted { color: var(--muted); font-family: inherit; }
+.pc .j-key { color: var(--j-key); } .pc .j-str { color: var(--j-str); } .pc .j-num { color: var(--j-num); }
+
+/* key/value table (kv-editor.js) with two extra column variants: variables (mask + delete), resolved (read-only) */
+.pc .kv { flex: 1; padding: 2px 0; }
+.pc .kv-row { display: grid; grid-template-columns: 24px minmax(80px, 38%) 1fr 22px; align-items: center; border-bottom: 1px solid var(--border); }
+.pc .kv.no-toggle .kv-row { grid-template-columns: 8px minmax(80px, 38%) 1fr 22px; }
+.pc .kv.vars .kv-row { grid-template-columns: 8px minmax(80px, 34%) 1fr 24px 22px; }
+.pc .kv.resolved .kv-row { grid-template-columns: 8px minmax(80px, 34%) 1fr 8px; }
+.pc .kv-row input[type=checkbox] { justify-self: center; }
+.pc .kv-row input:not([type]), .pc .kv-row input[type=text], .pc .kv-row input[type=password], .pc .kv-row .cell { border: none; border-radius: 0; background: none; font: 11px var(--mono); padding: 5px 6px; min-height: 26px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pc .kv-row .kv-key { border-right: 1px solid var(--border); }
+.pc .kv-row input:focus { background: var(--bg-hover); outline: none; }
+.pc .kv-row input[type=password] { letter-spacing: 1px; }
+.pc .kv-row .cell.unresolved { color: var(--err); }
+.pc .kv-row .cell.unresolved::before { content: "unresolved"; font: 11px system-ui, sans-serif; }
+.pc .kv-row .cell.empty-val { color: var(--muted); }
+.pc .kv-del, .pc .kv-mask { border: none; color: var(--muted); padding: 0; min-height: 0; width: auto; visibility: hidden; }
+.pc .kv-row:hover .kv-del, .pc .kv-row:hover .kv-mask, .pc .kv-mask[aria-pressed=true] { visibility: visible; }
+.pc .kv-row.blank .kv-del, .pc .kv-row.blank .kv-mask, .pc .kv-row.blank input[type=checkbox] { visibility: hidden; }
+.pc .kv-del:hover:not(:disabled) { color: var(--err); background: none; }
+.pc .kv-mask:hover:not(:disabled) { color: var(--text); background: none; }
+.pc .kv-mask svg { width: 13px; height: 13px; flex-basis: 13px; }
+.pc .kv-head { display: grid; grid-template-columns: 8px minmax(80px, 34%) 1fr 8px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); }
+.pc .kv-head span { padding: 4px 6px; }
+/* The Variables panel's first row: the active set, repeated here because its home (the group detail) is off-screen. */
+.pc .setrow { display: flex; align-items: center; gap: 6px; padding: 2px 9px; min-height: 28px; border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.pc .setrow select { font: 500 11px var(--mono); color: var(--text); min-height: 22px; padding: 1px 4px; }
+.pc .setrow .meta { margin-left: auto; }
+
+.pc .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; flex-shrink: 0; }
+.pc .segmented button { border: none; border-radius: 0; min-height: 22px; padding: 1px 7px; color: var(--muted); font-size: 11px; }
+.pc .segmented button + button { border-left: 1px solid var(--border); }
+.pc .segmented button.active { background: var(--bg-selected); color: var(--text); }
+.pc .pill { font: 500 11px var(--mono); white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 40px; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; }
+.pc .meta { color: var(--muted); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pc .status-line { border-top: 1px solid var(--border); padding: 3px 10px; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+.pc .status-line.ok { color: var(--ok); }
+.pc .status-line.warn { color: var(--warn); }
+.pc .status-line code { font: 11px var(--mono); }
+
+.pc .toast { position: absolute; right: 8px; bottom: 8px; left: 8px; width: fit-content; max-width: calc(100% - 16px); margin-left: auto; display: flex; gap: 10px; align-items: center; background: var(--text); color: var(--bg); padding: 6px 12px; border-radius: 6px; box-shadow: var(--shadow); opacity: 0; transform: translateY(8px); transition: opacity .15s, transform .15s; pointer-events: none; z-index: 10; font-size: 11px; }
+.pc .toast.show { opacity: 1; transform: none; pointer-events: auto; }
+/* Narrow: the toast sits above the status line, so "report after" never hides "warn before". */
+.pc.has-status .toast { bottom: 32px; }
+.pc .toast button.link { color: var(--toast-link); font-weight: 600; padding: 0; min-height: 0; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="frame-bar">
+    <strong>Postcat · Saved area</strong>
+    <span>1024 × 320, bottom dock · design prototype, simulated behaviour</span>
+    <label>Screen <select id="scene"></select></label>
+    <span class="seg" id="appearance" role="radiogroup" aria-label="Appearance">
+      <button type="button" role="radio" data-appearance="light" aria-checked="true">Light</button>
+      <button type="button" role="radio" data-appearance="dark" aria-checked="false">Dark</button>
+      <button type="button" role="radio" data-appearance="system" aria-checked="false">System</button>
+    </span>
+  </div>
+
+  <div class="pc" id="pc">
+    <svg hidden aria-hidden="true">
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3.5h12v17l-6-4.2-6 4.2z"/></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.2-4.2"/></symbol>
+      <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+      <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M4.5 19.5h15"/></symbol>
+      <symbol id="i-braces" viewBox="0 0 24 24"><path d="M9 3.5c-2.2 0-3 1-3 3v3.3c0 1.3-.9 2.2-2.2 2.2 1.3 0 2.2.9 2.2 2.2v3.3c0 2 .8 3 3 3M15 3.5c2.2 0 3 1 3 3v3.3c0 1.3.9 2.2 2.2 2.2-1.3 0-2.2.9-2.2 2.2v3.3c0 2-.8 3-3 3"/></symbol>
+      <symbol id="i-lines" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 6.1A10 10 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3.2 3.8M6.6 6.6A16 16 0 0 0 2.5 12s3.5 6 9.5 6a9.6 9.6 0 0 0 4.1-.9M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+      <symbol id="i-open" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+    </svg>
+
+    <div class="app" id="app" data-layout="wide" data-screen="detail" data-view="request">
+      <aside class="sidebar" aria-label="Request list">
+        <div class="toolbar list-tools">
+          <span class="collection" role="tablist" aria-label="Collection">
+            <button type="button" role="tab" data-tab="captured" aria-selected="false" title="Requests recorded from the page">Captured <span class="count">12</span></button>
+            <button type="button" role="tab" data-tab="saved" aria-selected="true" title="Your saved collection">Saved <span class="count" id="savedCount">8</span></button>
+          </span>
+          <span class="push"></span>
+          <button class="icon record" type="button" aria-pressed="true" aria-label="Pause recording" title="Pause recording"><span class="dot"></span></button>
+          <button class="icon new" type="button" aria-label="New request" title="New empty request"><svg><use href="#i-plus"/></svg><span class="new-label">New</span></button>
+        </div>
+        <div class="toolbar list-filter">
+          <label class="search" title="Filter by METHOD url, plain text or /regex/ · press / to focus">
+            <svg><use href="#i-search"/></svg>
+            <input type="search" placeholder="Filter requests" aria-label="Filter requests" spellcheck="false">
+          </label>
+          <button class="icon" type="button" aria-pressed="true" aria-label="Options" title="Options · XHR/Fetch only"><svg><use href="#i-filter"/></svg></button>
+        </div>
+        <ul class="list" id="list" role="listbox" aria-label="Saved requests"></ul>
+      </aside>
+
+      <div class="resizer" title="Drag to resize · double-click to reset"></div>
+
+      <main class="main" id="main"></main>
+    </div>
+
+    <div class="menu" id="rowMenu" role="menu" hidden></div>
+    <div class="toast" id="toast" role="status"><span id="toastText"></span><button id="toastAction" class="link" type="button" hidden></button></div>
+  </div>
+
+  <p class="frame-note">Click a row to select it, a group header to open its detail (chevron toggles the group), a set tab to activate the set, the eye to mask or reveal a value. Right-click a row for its menu, double-click a name (or F2) to rename; Enter commits, Esc reverts. Nothing is sent or stored.</p>
+</div>
+
+<script>
+'use strict';
+const ORIGIN = { shop: 'https://shop.example.com', gh: 'https://api.github.com', local: 'http://localhost:8767', dev: 'http://localhost:3000' };
+
+/* Sample collection. Group key = origin; label = host (+ port only when non-default). */
+function freshData() {
+  return {
+    inspected: ORIGIN.shop,
+    groups: [
+      { origin: ORIGIN.shop, name: 'Shop API', expanded: true, active: 'dev',
+        sets: {
+          dev: [ { k: 'baseUrl', v: 'https://shop.example.com' }, { k: 'id', v: '42' }, { k: 'apiKey', v: 'sk_test_51Hh3xK9qLm2vR8pT', secret: true } ],
+          staging: [ { k: 'baseUrl', v: 'https://staging.shop.example.com' }, { k: 'id', v: '7' }, { k: 'token', v: 'eyJhbGciOiJIUzI1NiJ9.staging.7f3a', secret: true } ],
+          prod: [ { k: 'baseUrl', v: 'https://shop.example.com' }, { k: 'token', v: 'eyJhbGciOiJIUzI1NiJ9.prod.c91e', secret: true } ],
+        },
+        requests: [
+          { id: 'r1', method: 'GET', name: null, url: 'https://shop.example.com/api/cats?page=1', status: 200, params: [['page', '1']], headers: [['Accept', 'application/json']], body: '', res: '{\n  "cats": [ { "id": 41 }, { "id": 42 } ],\n  "page": 1\n}', resHeaders: 3, time: '124 ms', size: '86 B' },
+          { id: 'r2', method: 'POST', name: 'Create cat', url: '{{baseUrl}}/api/cats', status: 201, edited: true, params: [], headers: [['Content-Type', 'application/json'], ['Authorization', 'Bearer {{token}}']], body: '{\n  "name": "Mittens",\n  "ownerId": {{id}}\n}', res: '{\n  "id": 42\n}', resHeaders: 3, time: '42 ms', size: '9 B' },
+          { id: 'r3', method: 'GET', name: null, url: '{{baseUrl}}/api/cats/{{id}}', status: null, params: [], headers: [['Authorization', 'Bearer {{token}}']], body: '', res: null },
+          { id: 'r4', method: 'DELETE', name: null, url: '{{baseUrl}}/api/cats/{{id}}', status: 204, params: [], headers: [['Authorization', 'Bearer {{token}}']], body: '', res: '', resHeaders: 2, time: '31 ms', size: '0 B' },
+        ] },
+      { origin: ORIGIN.gh, name: null, expanded: false, active: 'prod',
+        sets: {
+          dev: [ { k: 'baseUrl', v: 'https://api.github.com' }, { k: 'token', v: 'ghp_dev_9f8e7d6c5b4a', secret: true } ],
+          prod: [ { k: 'baseUrl', v: 'https://api.github.com' }, { k: 'token', v: 'ghp_prod_1a2b3c4d5e6f', secret: true } ],
+        },
+        requests: [
+          { id: 'g1', method: 'GET', name: 'Rate limit', url: '{{baseUrl}}/rate_limit', status: 200, params: [], headers: [['Authorization', 'Bearer {{token}}']], body: '', res: '{ "rate": { "limit": 5000 } }', resHeaders: 12, time: '210 ms', size: '412 B' },
+          { id: 'g2', method: 'GET', name: null, url: '{{baseUrl}}/repos/maphel/Postcat', status: 200, params: [], headers: [], body: '', res: '{ "name": "Postcat" }', resHeaders: 12, time: '188 ms', size: '2.1 kB' },
+          { id: 'g3', method: 'POST', name: 'Star repo', url: '{{baseUrl}}/user/starred/maphel/Postcat', status: 204, params: [], headers: [['Authorization', 'Bearer {{token}}']], body: '', res: '', resHeaders: 9, time: '240 ms', size: '0 B' },
+        ] },
+      { origin: ORIGIN.local, name: null, expanded: false, active: null, sets: {},
+        requests: [
+          { id: 'l1', method: 'GET', name: null, url: 'http://localhost:8767/cats/42/page.html', status: 200, params: [], headers: [], body: '', res: '<h1>Hello from Postcat</h1>', resHeaders: 5, time: '3 ms', size: '27 B' },
+        ] },
+    ],
+  };
+}
+
+const state = {
+  data: freshData(),
+  selected: null,          // { type: 'request', id } | { type: 'group', origin } | null
+  tab: 'params',           // params | headers | body | variables
+  view: 'request',         // narrow: request | response
+  screen: 'detail',        // narrow: list | detail
+  renaming: null,          // { type: 'request'|'group'|'set', id, value }
+  menu: null,              // { x, y, type, id }
+  toast: null,             // { text, action }
+  sentUnresolved: null,    // request id whose last send went out with unresolved placeholders
+  savedEmpty: false,
+};
+
+const canvas = document.documentElement.dataset.canvas; // wide | side
+const app = document.getElementById('app');
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const icon = id => `<svg><use href="#${id}"/></svg>`;
+
+/* ---------- helpers ---------- */
+function hostLabel(origin) { const u = new URL(origin); return u.host; } // host includes the port only when non-default
+function groupLabel(g) { return g.name || hostLabel(g.origin); }
+function groupOf(id) { return state.data.groups.find(g => g.requests.some(r => r.id === id)); }
+function findGroup(origin) { return state.data.groups.find(g => g.origin === origin); }
+function findRequest(id) { for (const g of state.data.groups) { const r = g.requests.find(r => r.id === id); if (r) return r; } return null; }
+function setNames(g) { return Object.keys(g.sets); }
+function activeVars(g) { return g.active && g.sets[g.active] ? g.sets[g.active] : []; }
+function pathOf(r) { return r.url.replace(/^(\{\{baseUrl\}\}|https?:\/\/[^/]+)/, '') || '/'; }
+function placeholdersOf(r) {
+  const text = [r.url, ...r.params.flat(), ...r.headers.flat(), r.body].join('\n');
+  return [...new Set([...text.matchAll(/\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g)].map(m => m[1]))];
+}
+function resolution(r) {
+  const g = groupOf(r.id); const vars = activeVars(g);
+  return placeholdersOf(r).map(name => { const v = vars.find(x => x.k === name); return { name, value: v ? v.v : null, secret: !!(v && v.secret), resolved: !!v && v.v !== '' }; });
+}
+function resolveText(r, text) { const vars = activeVars(groupOf(r.id)); return text.replace(/\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g, (m, n) => { const v = vars.find(x => x.k === n); return v && v.v !== '' ? v.v : m; }); }
+function orderedGroups() {
+  const gs = state.data.groups.slice();
+  return gs.sort((a, b) => (b.origin === state.data.inspected) - (a.origin === state.data.inspected) || hostLabel(a.origin).localeCompare(hostLabel(b.origin)));
+}
+function totalSaved() { return state.data.groups.reduce((n, g) => n + g.requests.length, 0); }
+function statusClass(s) { return s == null ? 's-none' : s >= 400 ? 's-client' : 's-ok'; }
+function statusText(s) { return s == null ? '—' : String(s); }
+const REASON = { 200: 'OK', 201: 'Created', 204: 'No Content', 401: 'Unauthorized' };
+
+/* ---------- render ---------- */
+function render() {
+  app.dataset.screen = state.screen; app.dataset.view = state.view;
+  renderList(); renderMain(); renderMenu(); renderToast();
+  $('#pc').classList.toggle('has-status', canvas === 'side' && state.screen === 'detail' && state.view === 'request' && !!$('#main .status-line'));
+}
+
+function renderList() {
+  const list = $('#list');
+  $('#savedCount').textContent = state.savedEmpty ? '' : totalSaved();
+  if (state.savedEmpty) {
+    list.innerHTML = `<li class="empty"><strong>Nothing saved yet</strong><kbd>⌘</kbd> <kbd>S</kbd> or the bookmark keeps the selected request.<br>Saved requests are grouped by origin.</li>`;
+    return;
+  }
+  let html = '';
+  for (const g of orderedGroups()) {
+    const sel = state.selected && state.selected.type === 'group' && state.selected.origin === g.origin;
+    const renaming = state.renaming && state.renaming.type === 'group' && state.renaming.id === g.origin;
+    const chip = g.active && setNames(g).length > 1 ? `<span class="chip" title="Active set: ${esc(g.active)} (${setNames(g).length} sets)">${esc(g.active)}</span>` : '';
+    const pinned = g.origin === state.data.inspected;
+    const title = `${g.origin} · ${g.requests.length} request${g.requests.length === 1 ? '' : 's'}${pinned ? ' · inspected page' : ''}${g.name ? ' · F2 or double-click to rename' : ''}`;
+    const label = renaming
+      ? `<input class="rename" value="${esc(state.renaming.value)}" aria-label="Group name" data-rename="group" data-id="${esc(g.origin)}" placeholder="${esc(hostLabel(g.origin))}">`
+      : `<span class="gname">${esc(groupLabel(g))}</span> <span class="count">${g.requests.length}</span>${g.name ? `<span class="gsub">${esc(hostLabel(g.origin))}</span>` : ''}`;
+    html += `<li class="group${g.name ? ' renamed' : ''}${sel ? ' selected' : ''}" data-origin="${esc(g.origin)}" role="option" aria-selected="${sel}" aria-expanded="${g.expanded}" title="${esc(title)}" tabindex="0">
+      <span class="chev" data-toggle="1">${icon('i-chev')}</span>
+      <span class="path">${label}</span>
+      <span class="status">${chip}</span></li>`;
+    if (!g.expanded) continue;
+    for (const r of g.requests) {
+      const rsel = state.selected && state.selected.type === 'request' && state.selected.id === r.id;
+      const rren = state.renaming && state.renaming.type === 'request' && state.renaming.id === r.id;
+      const name = rren
+        ? `<input class="rename" value="${esc(state.renaming.value)}" aria-label="Request name" data-rename="request" data-id="${r.id}" placeholder="${esc(pathOf(r))}">`
+        : `${r.edited ? '<span class="edited" title="Edited since saved">●</span>' : ''}${esc(r.name || pathOf(r))}`;
+      const resolved = resolveText(r, r.url);
+      html += `<li data-id="${r.id}" class="${rsel ? 'selected' : ''}" role="option" aria-selected="${rsel}" tabindex="0" title="${esc(r.method + ' ' + r.url + (resolved !== r.url ? '\n→ ' + resolved : '') + ' · saved 2 min ago')}">
+        <span class="method m-${r.method.toLowerCase()}">${r.method}</span>
+        <span class="path">${name}</span>
+        <span class="status ${statusClass(r.status)}">${statusText(r.status)}</span></li>`;
+    }
+  }
+  // Rows are keyed like list.js keys them: when only the selection changed, patch the classes and keep
+  // the nodes (double-click and F2 need the row to survive the first click).
+  const key = html.replace(/ selected|aria-selected="(true|false)"/g, '');
+  if (renderList.key === key) {
+    for (const li of list.children) {
+      const on = li.classList.contains('group') ? !!(state.selected && state.selected.type === 'group' && state.selected.origin === li.dataset.origin) : !!(state.selected && state.selected.type === 'request' && state.selected.id === li.dataset.id);
+      li.classList.toggle('selected', on); li.setAttribute('aria-selected', on);
+    }
+    return;
+  }
+  renderList.key = key;
+  const hadFocus = list.contains(document.activeElement);
+  list.innerHTML = html;
+  const inp = list.querySelector('input.rename');
+  if (inp) { inp.focus(); inp.select(); }
+  else if (hadFocus) { const sel = list.querySelector('li.selected'); if (sel) sel.focus({ preventScroll: true }); }
+}
+
+function renderMain() {
+  const main = $('#main');
+  const sel = state.selected;
+  if (!sel || state.savedEmpty) { main.innerHTML = emptyMain(); return; }
+  if (sel.type === 'group') { main.innerHTML = groupDetail(findGroup(sel.origin)); return; }
+  main.innerHTML = requestDetail(findRequest(sel.id));
+  const inp = main.querySelector('input.rename');
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function emptyMain() {
+  return `<div class="empty"><h2>Postcat</h2><p>${state.savedEmpty ? 'Nothing saved yet. Requests from this tab show up under Captured;<br><kbd>⌘</kbd> <kbd>S</kbd> or the bookmark keeps one here, grouped by origin.' : 'Pick a saved request to edit it and send it again,<br>or a group to edit the values its requests share.'}</p><button class="primary" type="button">New request</button></div>`;
+}
+
+function contextRow(name, sub, opts = {}) {
+  return `<div class="context">
+    <button class="back" type="button" data-act="back" title="Back to the request list">${icon('i-back')}Requests <span class="count">${totalSaved()}</span></button>
+    <span class="context-name" title="${esc(opts.title || name)}">${esc(name)}${sub ? ` <span class="gsub">${esc(sub)}</span>` : ''}</span>
+    <button class="icon" type="button" aria-label="New request" title="New empty request">${icon('i-plus')}</button>
+    ${opts.save ? `<button class="icon save saved" type="button" aria-label="Saved" title="Saved to ${esc(opts.groupName)} (⌘/Ctrl + S)">${icon('i-bookmark')}</button>` : ''}
+  </div>`;
+}
+
+function groupDetail(g) {
+  const names = setNames(g);
+  const vars = activeVars(g);
+  const renamingSet = state.renaming && state.renaming.type === 'set' ? state.renaming : null;
+  const tabs = names.map(n => renamingSet && renamingSet.id === n
+    ? `<input class="rename" value="${esc(renamingSet.value)}" aria-label="Set name" data-rename="set" data-id="${esc(n)}">`
+    : `<button type="button" role="tab" data-set="${esc(n)}" aria-selected="${n === g.active}" title="${n === g.active ? 'Active set' : 'Activate this set'} · F2 or double-click to rename">${esc(n)}</button>`).join('');
+  const head = names.length ? `<div class="pane-head">
+      <span role="tablist" aria-label="Sets" class="tabgroup sets">${tabs}<button class="add-set" type="button" data-act="add-set" aria-label="Add set" title="Add an empty set">${icon('i-plus')}</button></span>
+      <span class="push"></span>
+      <button class="ctx flush" type="button" data-act="dup-set" aria-label="Duplicate set" title="Duplicate ${esc(g.active)} as a new set">${icon('i-copy')}<span class="label">Duplicate set</span></button>
+    </div>` : '';
+  let body;
+  if (!names.length) {
+    body = `<div class="empty"><h2>No variables yet</h2><p>Requests in ${esc(groupLabel(g))} can use <code>{{name}}</code> in the URL, params, headers and body.<br>Values are stored as plain text in this browser profile, like the requests themselves.</p>
+      <div class="actions"><button class="secondary" type="button" data-act="starter" title="Creates the first set with baseUrl = ${esc(g.origin)}">Add baseUrl = ${esc(g.origin)}</button><button class="link" type="button" data-act="add-var">Add variable</button></div></div>`;
+  } else {
+    const rows = vars.map((v, i) => `<div class="kv-row">
+        <span></span>
+        <input class="kv-key" value="${esc(v.k)}" aria-label="Name" spellcheck="false">
+        <input class="kv-value" type="${v.secret ? 'password' : 'text'}" value="${esc(v.v)}" aria-label="Value" spellcheck="false">
+        <button class="kv-mask" type="button" data-act="mask" data-i="${i}" aria-pressed="${!!v.secret}" aria-label="${v.secret ? 'Show value' : 'Mask value'}" title="${v.secret ? 'Show value · masked in the UI only, stored as plain text' : 'Mask value in the UI (still stored as plain text)'}">${icon(v.secret ? 'i-eye' : 'i-eye-off')}</button>
+        <button class="kv-del" type="button" aria-label="Remove" title="Remove">${icon('i-x')}</button></div>`).join('');
+    body = `<div class="kv vars scroll no-toggle">
+      ${rows}
+      <div class="kv-row blank"><span></span><input class="kv-key" placeholder="Name" aria-label="New variable name"><input class="kv-value" placeholder="Value" aria-label="New variable value"><button class="kv-mask" type="button" tabindex="-1">${icon('i-eye-off')}</button><button class="kv-del" type="button" tabindex="-1">${icon('i-x')}</button></div>
+    </div>`;
+  }
+  const sub = `${g.origin} · ${g.requests.length} request${g.requests.length === 1 ? '' : 's'}`;
+  return `<div class="editor group-detail">
+    ${contextRow(groupLabel(g), g.name ? hostLabel(g.origin) : '', { title: sub })}
+    <div class="group-head"><h2 title="F2 or double-click the row to rename">${esc(groupLabel(g))}</h2><span class="gsub" title="${esc(sub)}">${esc(sub)}</span></div>
+    ${head}
+    ${body}
+  </div>`;
+}
+
+function requestDetail(r) {
+  const g = groupOf(r.id);
+  const res = resolution(r);
+  const unresolved = res.filter(x => !x.resolved);
+  const resolvedUrl = resolveText(r, r.url);
+  const tabs = ['params', 'headers', 'body', 'variables'];
+  const tabLabel = {
+    params: `Params ${r.params.length ? `<span class="count">${r.params.length}</span>` : ''}`,
+    headers: `Headers ${r.headers.length ? `<span class="count">${r.headers.length}</span>` : ''}`,
+    body: `Body ${r.body ? '<span class="dotmark" title="Has a body">●</span>' : ''}`,
+    variables: `Variables${g.active ? ` <span class="count">· ${esc(g.active)}</span>` : ''}${unresolved.length ? ' <span class="dotmark warn" title="Unresolved placeholders">●</span>' : ''}`,
+  };
+  const ctx = {
+    params: `<button class="ctx flush" type="button" aria-label="Bulk edit" title="Edit the params as plain text">${icon('i-lines')}<span class="label">Bulk edit</span></button>`,
+    headers: `<button class="ctx flush" type="button" aria-label="Bulk edit" title="Edit the headers as plain text">${icon('i-lines')}<span class="label">Bulk edit</span></button>`,
+    body: `<button class="ctx flush" type="button" aria-label="Beautify JSON" title="Format the JSON body">${icon('i-braces')}<span class="label">Beautify</span></button>`,
+    variables: `<button class="ctx flush group-link" type="button" data-act="open-group" data-origin="${esc(g.origin)}" aria-label="Open ${esc(groupLabel(g))}" title="Edit the variables of ${esc(groupLabel(g))}">${icon('i-open')}<span class="label">${esc(groupLabel(g))}</span></button>`,
+  };
+  const kvTable = (rows, cls) => `<div class="kv scroll ${cls}">${rows.map(([k, v]) => `<div class="kv-row"><input type="checkbox" checked aria-label="Enabled"><input class="kv-key" value="${esc(k)}" aria-label="Key" spellcheck="false"><input class="kv-value" value="${esc(v)}" aria-label="Value" spellcheck="false" title="${esc(resolveText(r, v))}"><button class="kv-del" type="button" aria-label="Remove" title="Remove">${icon('i-x')}</button></div>`).join('')}
+    <div class="kv-row blank"><input type="checkbox" tabindex="-1"><input class="kv-key" placeholder="Key"><input class="kv-value" placeholder="Value"><button class="kv-del" type="button" tabindex="-1">${icon('i-x')}</button></div></div>`;
+  let panel;
+  if (state.tab === 'params') panel = kvTable(r.params, '');
+  else if (state.tab === 'headers') panel = kvTable(r.headers, '');
+  else if (state.tab === 'body') panel = `<textarea class="editor-text" spellcheck="false" aria-label="Request body" placeholder="Request body (ignored for GET/HEAD)">${esc(r.body)}</textarea>`;
+  else panel = variablesPanel(r, g, res);
+  let status = '';
+  if (unresolved.length) status = `<div class="status-line warn" title="Unresolved placeholders go out as literal text">${res.length} variable${res.length === 1 ? '' : 's'} · ${unresolved.length} unresolved: ${unresolved.map(u => `<code>{{${esc(u.name)}}}</code>`).join(', ')}</div>`;
+  else if (state.tab === 'variables' && res.length) status = `<div class="status-line ok">${res.length} variable${res.length === 1 ? '' : 's'} · all resolved from ${esc(g.active)}</div>`;
+  else if (state.tab === 'body' && r.body) status = `<div class="status-line ok">✓ Valid JSON</div>`;
+
+  const sent = state.sentUnresolved === r.id;
+  const resStatus = sent ? 401 : r.status;
+  const resBody = sent ? '{\n  "error": "invalid token"\n}' : r.res;
+  const resHead = resStatus == null ? '' : `<span class="pill ${statusClass(resStatus)}" title="${resStatus} ${REASON[resStatus] || ''}">${resStatus} ${REASON[resStatus] || ''}</span><span class="meta">${sent ? '38 ms' : r.time}</span><span class="meta">${sent ? '27 B' : r.size}</span>`;
+  const source = sent ? `<select class="quiet source" aria-label="Response source" title="Recorded from the page, or the response to your last send"><option>Recorded</option><option selected>Sent</option></select>` : (resStatus == null ? '' : `<span class="source-label" title="Recorded from the page">Recorded</span>`);
+  const responsePane = `<section class="pane response-pane" aria-label="Response">
+      <div class="pane-head response-head">
+        <span role="tablist" aria-label="Response content" class="tabgroup"><button type="button" role="tab" aria-selected="true">Body</button><button type="button" role="tab" aria-selected="false">Headers ${resStatus == null ? '' : `<span class="count">${sent ? 4 : r.resHeaders}</span>`}</button></span>
+        ${resHead}<span class="push"></span>${source}
+        ${resStatus == null ? '' : `<button class="icon" type="button" aria-label="Copy" title="Copy">${icon('i-copy')}</button><button class="icon" type="button" aria-label="Save as file" title="Save as file…">${icon('i-download')}</button>`}
+      </div>
+      ${resStatus == null ? `<pre class="output muted">No response yet.\nSend this request to see its response.</pre>` : `<pre class="output">${highlight(resBody)}</pre>`}
+    </section>`;
+  const switcherStatus = resStatus == null ? '' : `<span class="status ${statusClass(resStatus)}">${resStatus}</span>`;
+  return `<div class="editor">
+    ${contextRow(r.name || pathOf(r), '', { save: true, groupName: groupLabel(g), title: r.method + ' ' + r.url })}
+    <div class="urlbar">
+      <div class="address">
+        <select aria-label="HTTP method" title="HTTP method" class="m-${r.method.toLowerCase()}"><option>${r.method}</option></select>
+        <input value="${esc(r.url)}" spellcheck="false" aria-label="Request URL" title="${esc(resolvedUrl !== r.url ? 'Sends to ' + resolvedUrl : 'Enter sends')}">
+      </div>
+      <button class="primary send" type="button" data-act="send" title="${esc(unresolved.length ? `Send to ${resolvedUrl} · {{${unresolved[0].name}}} is unresolved and goes out as literal text` : `Send to ${resolvedUrl} (⌘/Ctrl + Enter)`)}">Send</button>
+      <button class="icon save saved" type="button" aria-label="Saved" title="Saved to ${esc(groupLabel(g))} (⌘/Ctrl + S)">${icon('i-bookmark')}</button>
+      <button class="icon" type="button" data-act="more" aria-label="More actions" title="More actions">${icon('i-more')}</button>
+    </div>
+    <div class="switcher" role="tablist" aria-label="Detail view">
+      <button type="button" role="tab" data-view="request" aria-selected="${state.view === 'request'}">Request</button>
+      <button type="button" role="tab" data-view="response" aria-selected="${state.view === 'response'}">Response ${switcherStatus}</button>
+    </div>
+    <div class="split">
+      <section class="pane request-pane" aria-label="Request">
+        <div class="pane-head">
+          <span role="tablist" aria-label="Request fields" class="tabgroup">${tabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${state.tab === t}"${t === 'variables' ? ` title="Placeholders in this request and their values from the active set of ${esc(groupLabel(g))}"` : ''}>${tabLabel[t]}</button>`).join('')}</span>
+          <span class="push"></span>
+          ${ctx[state.tab]}
+        </div>
+        ${panel}
+        ${status}
+      </section>
+      <div class="resizer" title="Drag to resize · double-click to reset"></div>
+      ${responsePane}
+    </div>
+  </div>`;
+}
+
+function variablesPanel(r, g, res) {
+  const names = setNames(g);
+  if (!names.length) {
+    return `<div class="empty"><p>${esc(groupLabel(g))} has no variables.<br>Requests here can use <code>{{name}}</code> in the URL, params, headers and body.</p><button class="secondary" type="button" data-act="open-group" data-origin="${esc(g.origin)}">Open ${esc(groupLabel(g))}</button></div>`;
+  }
+  const setrow = `<div class="setrow"><span>Set</span><select aria-label="Active set" data-act="set-select" title="The active set of ${esc(groupLabel(g))}; changing it here changes it for every request in the group">${names.map(n => `<option${n === g.active ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select><span class="meta">${activeVars(g).length} value${activeVars(g).length === 1 ? '' : 's'} in set</span></div>`;
+  if (!res.length) return `${setrow}<div class="empty"><p>This request uses no placeholders yet.<br>Type <code>{{baseUrl}}</code> in the URL to try one.</p></div>`;
+  const rows = res.map(x => `<div class="kv-row"><span></span><span class="cell kv-key" title="{{${esc(x.name)}}}">${esc(x.name)}</span>${x.resolved ? `<span class="cell${x.secret ? '' : ''}" title="${esc(x.secret ? 'Masked in the group; sent as is' : x.value)}">${x.secret ? '••••••••••' : esc(x.value)}</span>` : `<span class="cell unresolved" title="Not in the ${esc(g.active)} set; sent as the literal text {{${esc(x.name)}}}"></span>`}<span></span></div>`).join('');
+  return `${setrow}<div class="kv resolved scroll no-toggle">${rows}</div>`;
+}
+
+function highlight(text) {
+  if (!text) return '<span class="muted">(empty body)</span>';
+  return esc(text).replace(/"([^"]+)"(?=\s*:)/g, '<span class="j-key">"$1"</span>').replace(/:\s*"([^"]*)"/g, m => m.replace(/"([^"]*)"$/, '<span class="j-str">"$1"</span>')).replace(/\b(\d+)\b(?![^<]*>)/g, '<span class="j-num">$1</span>');
+}
+
+function renderMenu() {
+  const m = $('#rowMenu');
+  if (!state.menu) { m.hidden = true; return; }
+  const { x, y, type } = state.menu;
+  m.innerHTML = type === 'request'
+    ? `<button type="button" role="menuitem" data-act="rename" title="Edit the name in the list (F2, or double-click the row)">Rename<span class="kbd">F2</span></button>
+       <button type="button" role="menuitem" title="Duplicate this request">Duplicate</button>
+       <button type="button" role="menuitem" title="Copy as a cURL command with the active set's values">Copy as cURL</button>
+       <hr><button type="button" role="menuitem" class="danger" title="Delete (Del)">Delete<span class="kbd">⌫</span></button>`
+    : type === 'group'
+    ? `<button type="button" role="menuitem" data-act="rename" title="Give the group a display name; the origin stays its key">Rename<span class="kbd">F2</span></button>
+       <button type="button" role="menuitem" title="Copy the origin">Copy origin</button>
+       <hr><button type="button" role="menuitem" class="danger" title="Delete the group with all its requests and variables">Delete group</button>`
+    : `<button type="button" role="menuitem" data-act="rename" title="Rename the set">Rename<span class="kbd">F2</span></button>
+       <button type="button" role="menuitem" data-act="dup-set">Duplicate set</button>
+       <hr><button type="button" role="menuitem" class="danger">Delete set</button>`;
+  m.hidden = false;
+  const pc = $('#pc').getBoundingClientRect();
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.min(x, pc.width - w - 4) + 'px';
+  m.style.top = Math.min(y, pc.height - h - 4) + 'px';
+}
+
+function renderToast() {
+  const t = $('#toast');
+  if (!state.toast) { t.classList.remove('show'); return; }
+  $('#toastText').textContent = state.toast.text;
+  const a = $('#toastAction');
+  a.hidden = !state.toast.action; a.textContent = state.toast.action || '';
+  t.classList.add('show');
+}
+
+/* ---------- interaction ---------- */
+function select(sel) { state.selected = sel; state.screen = 'detail'; state.menu = null; state.renaming = null; if (sel && sel.type === 'request' && state.tab === 'variables' && false) state.tab = 'params'; }
+function startRename(type, id) {
+  if (type === 'request') { const r = findRequest(id); state.renaming = { type, id, value: r.name || '' }; }
+  else if (type === 'group') { const g = findGroup(id); state.renaming = { type, id, value: g.name || '' }; }
+  else state.renaming = { type, id, value: id };
+  state.menu = null;
+}
+function commitRename(input, keep) {
+  if (!state.renaming) return;
+  const { type, id } = state.renaming; const value = input.value.trim();
+  if (keep) {
+    if (type === 'request') findRequest(id).name = value || null;
+    else if (type === 'group') findGroup(id).name = value || null;
+    else if (value && value !== id) { const g = findGroup(state.selected.origin); const set = g.sets[id]; delete g.sets[id]; g.sets[value] = set; if (g.active === id) g.active = value; }
+  }
+  state.renaming = null; render();
+}
+
+document.getElementById('pc').addEventListener('click', e => {
+  const t = e.target;
+  const act = t.closest('[data-act]');
+  if (state.menu && !t.closest('#rowMenu')) { state.menu = null; renderMenu(); }
+  if (t.closest('input.rename')) return;
+  const li = t.closest('li[data-id], li.group');
+  if (li && li.classList.contains('group')) {
+    const g = findGroup(li.dataset.origin);
+    if (t.closest('[data-toggle]')) { g.expanded = !g.expanded; renderList(); return; }
+    select({ type: 'group', origin: g.origin }); render(); return;
+  }
+  if (li) { select({ type: 'request', id: li.dataset.id }); render(); return; }
+  const tab = t.closest('[role=tab][data-tab]');
+  if (tab && tab.closest('.collection')) return;
+  if (tab) { state.tab = tab.dataset.tab; render(); return; }
+  const view = t.closest('[role=tab][data-view]');
+  if (view) { state.view = view.dataset.view; render(); return; }
+  const setTab = t.closest('[role=tab][data-set]');
+  if (setTab) { findGroup(state.selected.origin).active = setTab.dataset.set; render(); return; }
+  if (!act) return;
+  const a = act.dataset.act;
+  if (a === 'back') { state.screen = 'list'; state.renaming = null; render(); }
+  else if (a === 'open-group') { select({ type: 'group', origin: act.dataset.origin }); render(); }
+  else if (a === 'mask') { const g = findGroup(state.selected.origin); const v = activeVars(g)[+act.dataset.i]; v.secret = !v.secret; render(); }
+  else if (a === 'dup-set') { const g = findGroup(state.selected.origin); let n = g.active + ' copy'; while (g.sets[n]) n += ' 2'; g.sets[n] = activeVars(g).map(v => ({ ...v })); g.active = n; startRename('set', n); render(); }
+  else if (a === 'add-set') { const g = findGroup(state.selected.origin); let n = 'new set'; while (g.sets[n]) n += ' 2'; g.sets[n] = []; g.active = n; startRename('set', n); render(); }
+  else if (a === 'starter' || a === 'add-var') { const g = findGroup(state.selected.origin); g.sets = { default: a === 'starter' ? [{ k: 'baseUrl', v: g.origin }] : [] }; g.active = 'default'; render(); if (a === 'add-var') { const i = $('#main .kv-row.blank .kv-key'); if (i) i.focus(); } }
+  else if (a === 'rename') { const { type, id } = state.menu; startRename(type, id); render(); }
+  else if (a === 'more') { const r = $('#pc .urlbar [data-act=more]').getBoundingClientRect(), pc = $('#pc').getBoundingClientRect(); state.menu = { x: r.right - pc.left - 170, y: r.bottom - pc.top + 2, type: 'request', id: state.selected.id }; renderMenu(); }
+  else if (a === 'send') {
+    const r = findRequest(state.selected.id); const un = resolution(r).filter(x => !x.resolved);
+    if (un.length) { state.sentUnresolved = r.id; state.toast = { text: `Sent with ${un.length} unresolved: ${un.map(u => `{{${u.name}}}`).join(', ')} · 401`, action: 'Variables' }; }
+    else { state.sentUnresolved = null; state.toast = { text: `Sent to ${hostLabel(groupOf(r.id).origin)} · ${r.status || 200} in 38 ms`, action: null }; }
+    if (canvas === 'side') state.view = 'response';
+    render();
+    clearTimeout(state.toastTimer); state.toastTimer = setTimeout(() => { state.toast = null; renderToast(); }, 4000);
+  }
+});
+document.getElementById('pc').addEventListener('change', e => {
+  const s = e.target.closest('[data-act=set-select]');
+  if (s) { groupOf(state.selected.id).active = s.value; render(); }
+});
+document.getElementById('pc').addEventListener('contextmenu', e => {
+  const li = e.target.closest('li[data-id], li.group'); const setTab = e.target.closest('[role=tab][data-set]');
+  if (!li && !setTab) return;
+  e.preventDefault();
+  const pc = $('#pc').getBoundingClientRect();
+  state.menu = li ? (li.classList.contains('group') ? { type: 'group', id: li.dataset.origin } : { type: 'request', id: li.dataset.id }) : { type: 'set', id: setTab.dataset.set };
+  state.menu.x = e.clientX - pc.left; state.menu.y = e.clientY - pc.top;
+  renderMenu();
+});
+document.getElementById('pc').addEventListener('dblclick', e => {
+  const li = e.target.closest('li[data-id], li.group'); const setTab = e.target.closest('[role=tab][data-set]');
+  if (li && li.classList.contains('group')) startRename('group', li.dataset.origin);
+  else if (li) startRename('request', li.dataset.id);
+  else if (setTab) startRename('set', setTab.dataset.set);
+  else return;
+  render();
+});
+document.getElementById('pc').addEventListener('keydown', e => {
+  const inp = e.target.closest('input.rename');
+  if (inp) { if (e.key === 'Enter') commitRename(inp, true); else if (e.key === 'Escape') commitRename(inp, false); return; }
+  if (e.key === 'Escape' && state.menu) { state.menu = null; renderMenu(); return; }
+  const li = e.target.closest('li[data-id], li.group');
+  if (li && e.key === 'F2') { if (li.classList.contains('group')) startRename('group', li.dataset.origin); else startRename('request', li.dataset.id); render(); }
+  if (li && li.classList.contains('group') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { findGroup(li.dataset.origin).expanded = e.key === 'ArrowRight'; renderList(); }
+  const setTab = e.target.closest('[role=tab][data-set]');
+  if (setTab && e.key === 'F2') { startRename('set', setTab.dataset.set); render(); }
+});
+document.getElementById('pc').addEventListener('focusout', e => { const inp = e.target.closest && e.target.closest('input.rename'); if (inp && state.renaming) setTimeout(() => { if (state.renaming && !document.activeElement.closest?.('input.rename')) commitRename(inp, true); }, 0); });
+$('#toastAction').addEventListener('click', () => { if (state.toast && state.toast.action === 'Variables') { state.tab = 'variables'; state.view = 'request'; } else if (state.toast && state.toast.action === 'Rename' && state.selected) { startRename('request', state.selected.id); } state.toast = null; render(); });
+
+/* ---------- scenes: the states the design review asked for ---------- */
+const SCENES = {
+  'list':          { title: 'Saved list · request selected (Headers)', apply() { select({ type: 'request', id: 'r2' }); state.tab = 'headers'; state.screen = 'list'; } },
+  'group':         { title: 'Group detail · set tabs, masked secret', apply() { select({ type: 'group', origin: ORIGIN.shop }); } },
+  'group-empty':   { title: 'Group detail · no variables yet', apply() { select({ type: 'group', origin: ORIGIN.local }); } },
+  'variables':     { title: 'Request · Variables tab, 1 unresolved', apply() { select({ type: 'request', id: 'r2' }); state.tab = 'variables'; } },
+  'rename-group':  { title: 'Inline rename · group row', apply() { select({ type: 'request', id: 'r2' }); state.tab = 'params'; state.screen = 'list'; startRename('group', ORIGIN.shop); state.renaming.value = 'Shop API'; } },
+  'rename-request':{ title: 'Inline rename · request row', apply() { select({ type: 'request', id: 'r2' }); state.tab = 'params'; state.screen = 'list'; startRename('request', 'r2'); } },
+  'context-menu':  { title: 'Row context menu', apply() { select({ type: 'request', id: 'r2' }); state.tab = 'params'; state.screen = 'list'; state.menu = { type: 'request', id: 'r2', x: canvas === 'side' ? 120 : 96, y: canvas === 'side' ? 138 : 128 }; } },
+  'save-toast':    { title: 'Saved into a new origin group · toast', apply() {
+      const g = { origin: ORIGIN.dev, name: null, expanded: true, active: null, sets: {}, requests: [ { id: 'n1', method: 'GET', name: null, url: 'http://localhost:3000/api/health', status: null, params: [], headers: [], body: '', res: null } ] };
+      state.data.groups.push(g); select({ type: 'request', id: 'n1' }); state.tab = 'params'; state.screen = 'list'; state.toast = { text: 'Saved to localhost:3000', action: 'Rename' }; } },
+  'send-unresolved': { title: 'Sent with an unresolved variable', apply() { select({ type: 'request', id: 'r2' }); state.tab = 'headers'; state.sentUnresolved = 'r2'; state.toast = { text: 'Sent with 1 unresolved: {{token}} · 401', action: 'Variables' }; } },
+  'empty':         { title: 'Saved list · empty', apply() { state.savedEmpty = true; state.selected = null; state.screen = 'list'; } },
+};
+function applyScene(name) {
+  Object.assign(state, { data: freshData(), selected: null, tab: 'params', view: 'request', screen: 'detail', renaming: null, menu: null, toast: null, sentUnresolved: null, savedEmpty: false });
+  clearTimeout(state.toastTimer);
+  (SCENES[name] || SCENES.list).apply();
+  render();
+  if (state.menu) renderMenu();
+}
+const sceneSel = $('#scene');
+for (const [k, s] of Object.entries(SCENES)) { const o = document.createElement('option'); o.value = k; o.textContent = s.title; sceneSel.appendChild(o); }
+sceneSel.addEventListener('change', () => applyScene(sceneSel.value));
+
+/* appearance: light / dark / system, on the canvas only */
+const mq = matchMedia('(prefers-color-scheme: dark)');
+let appearance = 'light';
+function applyAppearance() { $('#pc').classList.toggle('dark', appearance === 'dark' || (appearance === 'system' && mq.matches)); for (const b of $('#appearance').children) b.setAttribute('aria-checked', b.dataset.appearance === appearance); }
+$('#appearance').addEventListener('click', e => { const b = e.target.closest('[data-appearance]'); if (!b) return; appearance = b.dataset.appearance; applyAppearance(); });
+mq.addEventListener('change', applyAppearance);
+
+/* hooks for the screenshot script and the URL: ?scene=group&appearance=dark */
+window.postcatMock = { applyScene, setAppearance(a) { appearance = a; applyAppearance(); }, state };
+const q = new URLSearchParams(location.search);
+if (q.get('appearance')) appearance = q.get('appearance');
+applyAppearance();
+applyScene(q.get('scene') || 'list');
+sceneSel.value = q.get('scene') || 'list';
+</script>
+</body>
+</html>
