@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Start a run by hand (`gh workflow run check.yml --ref main`), e.g. when GitHub dropped a push event.
+  workflow_dispatch:
 
 permissions:
   contents: read
