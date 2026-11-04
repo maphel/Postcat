@@ -4,9 +4,9 @@ This folder prepares the first manual, **Unlisted** submission for
 [issue #17](https://github.com/maphel/Postcat/issues/17). It does not publish an item or automate
 uploads. Keep the listing, privacy policy and dashboard declarations aligned with the code.
 
-## Current draft
+## Initial draft snapshot
 
-Prepared in the Developer Dashboard on 4 November 2026:
+Prepared in the Developer Dashboard on 4 November 2026, before the final data-use review:
 
 - Item ID: `bmhjhdigonoppemjphobiinpnhmjdgbo`.
 - [Open the draft](https://chrome.google.com/webstore/devconsole/43a0ed5f-3843-47c6-a051-82137c3c3547/bmhjhdigonoppemjphobiinpnhmjdgbo/edit)
@@ -46,6 +46,24 @@ The screenshots show synthetic demo requests against a local harness server, wit
 data. They are captured from the actual extension UI, not mockups. Generate them with
 `npm run screenshot -- --store`; the regular command still writes the README screenshots.
 An optional promotional tile can be added later if wanted.
+
+## Recommended data-use declarations
+
+The code review recommends selecting **Authentication information**, **Web history**,
+**User activity** and **Website content**. Postcat accesses authentication headers, request URLs,
+request/response content and network activity for its explicit DevTools monitoring function.
+These are local data accesses even though no telemetry is sent to the developer.
+
+The review recommends leaving **Personally identifiable information**, **Health information**,
+**Financial and payment information**, **Personal communications** and **Location** unselected:
+Postcat does not provide features that target, extract or classify those semantic categories.
+Arbitrary opaque API payloads may contain such information; that possibility is disclosed in
+the privacy policy and reviewer notes. This mapping is the project's interpretation of the
+dashboard definitions, not a Google-issued exception. The maintainer must confirm it against
+the actual form and intended use before submission.
+
+Review the three data-use certifications separately against the disclosed purposes and Limited
+Use statement. A category selection does not itself confirm a certification.
 
 ## Privacy policy URL
 

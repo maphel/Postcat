@@ -20,10 +20,13 @@ header supplied by DevTools.
 ## Local processing and storage
 
 Captured requests and responses are held in memory while the panel is open. They are not
-automatically written to the saved collection. New requests and imported cURL commands are
-created in the saved collection. If you save a captured request, its name, method, URL,
-headers and body are stored in `chrome.storage.local`, alongside panel settings such as appearance,
-filter text and layout. Response bodies are not persisted in the saved collection.
+automatically written to the saved collection. Creating a new request or pasting a cURL command
+outside an input creates a saved request. Pasting cURL into the URL field updates the selected
+request without changing whether it is captured or saved. Saved requests' names, methods, URLs,
+headers and bodies are stored in `chrome.storage.local`, alongside panel settings such as
+appearance, filter text and layout. Saving a captured request copies it into this collection;
+subsequent edits to saved requests are saved automatically. Response bodies are not persisted
+in the saved collection.
 
 This storage is local to your browser profile; Postcat does not use `chrome.storage.sync` or
 provide cloud synchronization. Saved requests are stored as plain text, including any credentials
@@ -40,6 +43,11 @@ removed when you delete a request in Postcat.
 Postcat has no developer-operated backend, analytics, telemetry, advertising or crash reporting.
 The developer does not receive your captured traffic or saved collection through the extension,
 and does not sell or use it for advertising.
+
+Postcat's use of user data complies with the Chrome Web Store User Data Policy, including its
+[Limited Use requirements](https://developer.chrome.com/docs/webstore/program-policies/limited-use).
+Data is used only to provide the request debugging features described in this policy. It is not
+sold or used for unrelated purposes, personalized advertising, or creditworthiness or lending decisions.
 
 When you choose Send, Postcat sends the request from the extension's service worker to the HTTP
 or HTTPS address in the editor. The server receives the request data you send and ordinary network
