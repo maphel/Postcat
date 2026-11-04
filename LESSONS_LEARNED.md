@@ -2,6 +2,17 @@
 
 Append-only incident log, newest first. Each entry: symptom, root cause, fix, prevention.
 
+## 2026-11-04 — The merge to main got no CI run
+
+**Symptom:** After #22 was squash-merged, `main` (fe26830) had no `check` run; the merge call
+itself had answered with a 502.
+**Root cause:** GitHub dropped the `push` event during an incident, and `check.yml` had no
+`workflow_dispatch`, so the run could not be started again.
+**Fix:** `main`'s tree was compared with the green PR head (identical) and `npm run check` ran
+locally; `check.yml` now accepts `workflow_dispatch`.
+**Prevention:** After every merge, confirm a `check` run exists for the merge commit; if none
+appears, start it with `gh workflow run check.yml --ref main`.
+
 ## 2026-09-23 — Keys inside a popover menu reached the global shortcuts
 
 **Symptom:** ArrowDown in an open ⋯ menu moved the list selection underneath the menu; Backspace
