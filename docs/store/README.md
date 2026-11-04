@@ -13,8 +13,13 @@ Prepared in the Developer Dashboard on 4 November 2026:
   (publisher account required).
 - Distribution is **Unlisted** and free; listing language is English and category is Developer Tools.
 - The icon and all four screenshots are saved, and the contact email is verified.
+- Single purpose, permission explanations, the no-remote-code declaration, the branch privacy
+  policy URL and the 390-character test instructions are saved.
 - Data-use categories and the three data-use certifications remain unselected for maintainer review.
-  The draft is not ready for submission until these declarations and remaining validation are complete.
+  The dashboard's final validation reports one blocker: the developer-policy data-use confirmation,
+  represented by the three unchecked certifications. Unselected categories are not themselves a
+  dashboard validation error; they still need the maintainer's substantive review.
+- Nothing has been submitted for review or published.
 
 ## Files to upload or copy
 
