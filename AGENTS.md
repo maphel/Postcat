@@ -15,12 +15,13 @@ dependencies. `README.md` describes the behaviour; this file describes the code.
 | `src/panel.html`, `src/panel.css` | Panel markup and styles; colours only via custom properties in `:root` / `:root.dark`. Three layouts (wide / medium / narrow) keyed off `data-layout`, `data-screen` and `data-view` on `.app`; menus are `[popover]` elements |
 | `src/panel/main.js`, `actions.js` | Entry point: event wiring, shortcuts, boot; user actions that change the selection or which items exist |
 | `src/panel/state.js`, `storage.js` | Single `state` object and selectors; `chrome.storage.local` with validation and debounced writes |
-| `src/panel/capture.js`, `sending.js` | HAR entries → items (dedupe by occurrence, import); `send` / `cancelSend` / `abandonSend` |
+| `src/panel/capture.js`, `sending.js` | HAR entries → items (dedupe by occurrence, import), shared `trimCaptured` cap for capture/duplicate/undo; `send` / `cancelSend` / `abandonSend` |
 | `src/panel/list.js`, `editor.js`, `kv-editor.js` | Request list (rAF-batched), editor tabs, key/value table |
 | `src/panel/response.js`, `search.js`, `layout.js`, `dom.js` | Response rendering and previews, ⌘F search, layout modes from the panel width (ResizeObserver), narrow list/detail screens, Request/Response switcher, appearance, resizers; DOM helpers, toast, popover menus |
 | `src/lib/` | Pure helpers (`headers`, `url`, `har`, `curl`, `json`, `body`, `format`; `index.js` re-exports). No DOM, no `chrome`. Shared by panel, worker and tests |
-| `test/*.test.js` | Unit tests (`node:test`): `lib.test.js` covers `src/lib`, `regressions.test.js` pins fixed bugs, `pack.test.js` packs and checks the zip's contents |
+| `test/*.test.js` | Unit tests (`node:test`): `lib.test.js` covers `src/lib`, `regressions.test.js` pins fixed bugs, `pack.test.js` checks the zip, `release.test.js` exercises release guards in disposable local repositories |
 | `test/e2e.js`, `test/real-devtools.js` | Playwright e2e against the stubbed `chrome.devtools`; real Chrome + DevTools over CDP |
+| `test/qa.js`, `test/worker-qa.js` | Additional DOM state/boundary checks and real-worker replay/cancellation/body-limit regressions; included by `npm run test:e2e`, separately runnable with `npm run test:qa` |
 | `test/harness.js`, `test/devtools-stub.js` | Builds and launches the extension for e2e and the screenshot script, with shared waits (`waitForRows`, `waitForSendDone`); the fake `chrome.devtools` the harness page loads before the panel |
 | `scripts/pack.js`, `scripts/screenshot.js` | Zip for distribution (excludes `src/build-info.js`; `test/pack.test.js` checks that); renders README images (`docs/screenshot*.png`: bottom and side docking, light and dark) or `--store` screenshots (1280×800 and 640×400) through the harness |
 | `docs/privacy.md`, `docs/store/` | Privacy policy, Chrome Web Store listing text and submission checklist, permission explanations, and store screenshots |

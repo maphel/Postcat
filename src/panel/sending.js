@@ -1,6 +1,6 @@
 // Replaying requests through the service worker (see background.js).
 import { parseHeaders } from '../lib/index.js';
-import { state, current, nextId } from './state.js';
+import { state, current } from './state.js';
 import { $, toast } from './dom.js';
 import { renderResponse } from './response.js';
 import { renderList } from './list.js';
@@ -21,7 +21,8 @@ export async function send() {
     $('url').focus();
     return;
   }
-  const sendId = `${item.id}:${nextId()}`;
+  // Item ids are local to a panel; separate DevTools windows must never share a cancellation token.
+  const sendId = crypto.randomUUID();
   state.responses.set(item.id, { pending: true, sendId });
   item.view = 'sent';
   renderResponse();

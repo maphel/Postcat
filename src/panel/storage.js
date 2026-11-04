@@ -1,13 +1,21 @@
 // chrome.storage.local: the saved collection and the panel settings.
-import { state, nextId, DEFAULT_LAYOUT, APPEARANCES } from './state.js';
+import { state, nextId, DEFAULT_LAYOUT, LAYOUT_LIMITS, APPEARANCES } from './state.js';
 import { toast } from './dom.js';
 
 const SAVED_KEY = 'postcat.saved';
 const SETTINGS_KEY = 'postcat.settings';
+let storageLoaded = false;
 
 // Everything read back is validated: one corrupt record must not break the panel.
 export async function loadStorage() {
-  const data = await chrome.storage.local.get([SAVED_KEY, SETTINGS_KEY]);
+  let data;
+  try {
+    data = await chrome.storage.local.get([SAVED_KEY, SETTINGS_KEY]);
+    storageLoaded = true;
+  } catch (err) {
+    toast(`Couldn’t load saved requests: ${err?.message || err}`);
+    data = {};
+  }
   const str = (v, fallback = '') => (typeof v === 'string' ? v : fallback);
   state.saved = (Array.isArray(data[SAVED_KEY]) ? data[SAVED_KEY] : [])
     .filter((item) => item && typeof item === 'object')
@@ -29,8 +37,8 @@ export async function loadStorage() {
   if (APPEARANCES.includes(s.appearance)) state.appearance = s.appearance;
   const num = (v, fallback) => (Number.isFinite(v) ? v : fallback);
   state.layout = {
-    sidebarW: num(s.layout?.sidebarW, DEFAULT_LAYOUT.sidebarW),
-    reqW: num(s.layout?.reqW, DEFAULT_LAYOUT.reqW),
+    sidebarW: Math.max(LAYOUT_LIMITS.sidebarMin, num(s.layout?.sidebarW, DEFAULT_LAYOUT.sidebarW)),
+    reqW: Math.max(LAYOUT_LIMITS.reqMin, Math.min(LAYOUT_LIMITS.reqMax, num(s.layout?.reqW, DEFAULT_LAYOUT.reqW))),
   };
 }
 
@@ -48,8 +56,18 @@ export function persistSaved() {
 }
 
 // A rejected write (quota exhausted, storage unavailable) would otherwise stop autosave silently.
-function write(items) {
-  return chrome.storage.local.set(items).catch((err) => toast(`Couldn’t save: ${err?.message || err}`));
+async function write(items) {
+  if (!storageLoaded) {
+    toast('Couldn’t save: saved requests haven’t loaded. Reopen DevTools to retry.');
+    return false;
+  }
+  try {
+    await chrome.storage.local.set(items);
+    return true;
+  } catch (err) {
+    toast(`Couldn’t save: ${err?.message || err}`);
+    return false;
+  }
 }
 
 let settingsTimer = 0;
@@ -60,6 +78,7 @@ export function persistSettings() {
 
 function writeSettings() {
   settingsTimer = 0;
+  if (!storageLoaded) return; // Never replace settings that could not be read.
   const { xhrOnly, bulkHeaders, tab, reqTab, filterText, layout, appearance } = state;
   return write({ [SETTINGS_KEY]: { xhrOnly, bulkHeaders, tab, reqTab, filterText, layout, appearance } });
 }

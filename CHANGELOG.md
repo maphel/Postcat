@@ -10,6 +10,19 @@ All notable changes to Postcat are listed here. The format is based on
 ### Changed
 - Describe Postcat as an API client in DevTools and document its privacy practices for the Chrome Web Store.
 
+### Fixed
+- Keep cancellation isolated between DevTools windows, cancel queued requests immediately, and
+  replay Unicode URL credentials correctly.
+- Preserve cURL quoting, custom methods, empty headers and query parameters before fragments;
+  accept cURL executable paths in the panel and reject unfinished quoted commands.
+- Decode UTF-16 big-endian responses correctly, keep binary previews from copying stale text,
+  search Unicode responses safely and round media durations across minute boundaries.
+- Report already formatted JSON correctly when Beautify has nothing to change.
+- Recover capture after storage read failures without overwriting unread collections, retain
+  write-error notices and validate stored layout dimensions.
+- Apply the captured-request cap consistently to duplication and undo.
+- Require the exact release commit title before tagging, allowing GitHub's squash PR suffix.
+
 ## 0.2.0 — 2026-09-23
 
 ### Added

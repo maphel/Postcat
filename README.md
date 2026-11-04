@@ -47,6 +47,8 @@ Dark or System, which follows DevTools' theme); its last line shows the installe
 (`Postcat 0.1.0`). The **filter** matches `METHOD url` as
 plain text or `/regex/`. The **Captured** and **Saved** tabs above the list (with their counts)
 switch the collection with one click.
+Captured requests are capped at 1,000 entries, including duplicates and restored entries; the
+request currently open in the editor is kept.
 
 **Editing** a captured request marks it with ● in the list; **Reset to recorded** (in the ⋯ menu
 next to Send, together with Duplicate, Copy as cURL and Delete; a right-click on a list row opens
@@ -108,6 +110,8 @@ scoped to the exact target origin and removed after the request.
 - File uploads (multipart bodies) are recorded as text and may not replay byte-exact.
 - Saved requests are stored in `chrome.storage.local` in plain text, including any `Cookie`
   or `Authorization` headers. Remove headers you do not need before saving on a shared machine.
+- If saved requests cannot be loaded, capture remains available and existing storage is protected
+  from replacement. Reopen DevTools to retry; requests edited during this failure are not saved.
 - `Set-Cookie` response headers are hidden by the Fetch API and do not show in replays.
 
 ## Development
@@ -115,8 +119,9 @@ scoped to the exact target origin and removed after the request.
 ```bash
 npm install
 npm run lint        # eslint
-npm test            # unit tests for src/lib (node:test)
+npm test            # unit/regression tests, packaging and isolated release guards (node:test)
 npm run test:e2e    # extension in headless Chromium with a stubbed DevTools API (Playwright)
+npm run test:qa     # additional panel states, cancellation races and body-limit boundaries
 npm run test:real   # real Chrome with real DevTools, driven over CDP
 npm run check       # all of the above
 npm run pack        # dist/postcat-<version>.zip

@@ -22,7 +22,13 @@ export function addCaptured(entry, occurrence) {
   const item = { id: nextId(), kind: 'captured', name: '', entry, original, ...recorded };
   state.captured.unshift(item);
   fetchRecordedBody(item);
-  if (state.captured.length > MAX_CAPTURED) {
+  trimCaptured();
+  return true;
+}
+
+// Capture, duplication and undo all use the same limit and removal cleanup.
+export function trimCaptured() {
+  while (state.captured.length > MAX_CAPTURED) {
     // Drop the oldest entry, but never the one open in the editor.
     let idx = state.captured.length - 1;
     if (state.captured[idx].id === state.selectedId) idx--;
@@ -30,7 +36,6 @@ export function addCaptured(entry, occurrence) {
     abandonSend(dropped.id);
     state.responses.delete(dropped.id);
   }
-  return true;
 }
 
 // "Import log": everything DevTools has, minus what's already captured. Returns the count added.

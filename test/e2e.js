@@ -333,6 +333,16 @@ function ok(name, condition, detail) {
   check('cURL header sent', curlEcho.headers['x-from'], 'curl');
   check('cURL body sent', curlEcho.body, 'hi');
 
+  // Commands copied from Windows or an explicit executable path use the same importer.
+  for (const executable of ['curl.exe', '/usr/bin/curl', '"/opt/curl tools/curl"']) {
+    await page.evaluate((executable) => {
+      const dt = new DataTransfer();
+      dt.setData('text/plain', `${executable} 'http://localhost:8765/from-curl' -X PATCH -H 'X-Executable: yes' --data-raw 'prefix body'`);
+      document.getElementById('url').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }));
+    }, executable);
+    check(`${executable} URL paste imports the command`, [await page.inputValue('#url'), await page.inputValue('#method'), await page.inputValue('#body')], ['http://localhost:8765/from-curl', 'PATCH', 'prefix body']);
+  }
+
   // Delete with undo; the tab and editor tab reach storage.
   check('saved list', await rows(), 2);
   await page.evaluate(() => document.activeElement.blur());
@@ -423,6 +433,11 @@ function ok(name, condition, detail) {
   await page.click('#resMode button[data-mode=preview]');
   includes('HTML preview in an iframe', await page.locator('#resPreview iframe').getAttribute('srcdoc'), '<h1>Hello page</h1>');
   check('HTML preview sandboxed', await page.locator('#resPreview iframe').getAttribute('sandbox'), '');
+
+  // Reselecting a completed binary replay must not copy text from the previously viewed response.
+  await pick('/media/img.png');
+  check('reselected sent image previewed', await imgLoaded(), true);
+  check('binary preview never offers stale Copy from an HTML response', await bodyActionOffered('#resCopy', '#copyResBtn'), false);
 
   await pick('/media/nocopy');
   includes('no-copy notice', await page.textContent('#resPreview .notice').catch(() => ''), 'kept no copy');
@@ -517,6 +532,13 @@ function ok(name, condition, detail) {
   await page.fill('#body', '{"id":12345678901234567890}');
   await page.click('#beautifyBtn');
   check('Beautify keeps big integers', await page.inputValue('#body'), '{\n  "id": 12345678901234567890\n}');
+  await page.click('#beautifyBtn');
+  check('Beautify recognizes already formatted valid JSON', await page.textContent('#toastText'), 'Body is already formatted');
+  check('repeated Beautify preserves the exact body', await page.inputValue('#body'), '{\n  "id": 12345678901234567890\n}');
+  await page.fill('#body', '{"id":}');
+  await page.click('#beautifyBtn');
+  check('Beautify explains invalid JSON', await page.textContent('#toastText'), 'Body isn’t valid JSON');
+  check('Beautify leaves invalid JSON unchanged', await page.inputValue('#body'), '{"id":}');
 
   // Editing one query param keeps the others byte-for-byte.
   await newRequest('http://localhost:8765/p?redirect=https%3A%2F%2Fx.com%2F&q=a+b&sig=abc');
@@ -979,6 +1001,66 @@ function ok(name, condition, detail) {
   await page.dblclick('#sidebarResizer');
   await settle(() => document.getElementById('sidebar').clientWidth === 214);
   check('sidebar reset: both tabs stay, nothing clipped', await listTools(), [214, true, true, []]);
+
+  // Finite but out-of-range persisted dimensions must keep both panes usable.
+  for (const [sidebarW, reqW, expectedSidebar, expectedReq] of [[-30, -5, 180, '20%'], [1e9, 150, 495, '80%']]) {
+    const dimensions = await openPanel(ctx, id, { width: 1100, height: 500, init: `
+      chrome.storage.local.get = async () => ({ 'postcat.settings': { layout: { sidebarW: ${sidebarW}, reqW: ${reqW} } } });
+      chrome.storage.local.set = async () => {};
+    ` });
+    await dimensions.page.waitForFunction(() => document.querySelector('#requestList .empty'));
+    check(`layout dimensions ${sidebarW}/${reqW} stay in range`, await dimensions.page.evaluate(() => [
+      document.getElementById('sidebar').clientWidth,
+      document.documentElement.style.getPropertyValue('--req-w'),
+    ]), [expectedSidebar, expectedReq]);
+    check('invalid dimensions cause no panel errors', dimensions.errors, []);
+    await dimensions.page.close();
+  }
+
+  // Storage failures must leave a usable panel and keep their error visible.
+  await page.fill('#filterInput', 'storage-qa-flush-marker');
+  check('main settings writes finish before seeding unread storage', (await stored('postcat.settings', (s) => s?.filterText === 'storage-qa-flush-marker'))?.filterText, 'storage-qa-flush-marker');
+  const unread = { name: 'Preserve unread collection', method: 'GET', url: 'https://example.test/unread', headersText: '', body: '' };
+  await page.evaluate((unread) => chrome.storage.local.set({ 'postcat.saved': [unread], 'postcat.settings': { filterText: 'unread setting' } }), unread);
+  const offline = await openPanel(ctx, id, { width: 1100, height: 500, init: `
+    chrome.storage.local.get = async () => { throw new Error('storage offline'); };
+  ` });
+  await offline.page.evaluate(() => __emit(harEntry({ url: 'https://example.test/storage-offline', content: '{"ok":true}' })));
+  await waitForRows(offline.page, 1, 2000).catch(() => {});
+  check('capture boots when storage cannot be read', await offline.page.locator('#requestList li[data-id]').count(), 1);
+  includes('storage read failure is explained', await offline.page.textContent('#toastText'), 'storage offline');
+  check('storage read failure is handled', offline.errors, []);
+  await offline.page.click('#newListBtn');
+  includes('saving after a failed read explains how to retry', await offline.page.textContent('#toastText'), 'Reopen DevTools');
+  await offline.page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.setData('text/plain', "curl 'https://example.test/offline-import' --data-raw 'unsaved body'");
+    document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }));
+  });
+  check('cURL paste after a failed read still creates an editable draft', await offline.page.inputValue('#url'), 'https://example.test/offline-import');
+  includes('cURL import never hides a storage read error with a success toast', await offline.page.textContent('#toastText'), 'Reopen DevTools');
+  await offline.page.close();
+  check('failed reads never overwrite the unread collection or settings', await page.evaluate(() => chrome.storage.local.get(['postcat.saved', 'postcat.settings'])), {
+    'postcat.saved': [unread], 'postcat.settings': { filterText: 'unread setting' },
+  });
+
+  const failedWrite = await openPanel(ctx, id, { width: 1100, height: 500, init: `
+    chrome.storage.local.get = async () => ({});
+  ` });
+  await failedWrite.page.evaluate(() => {
+    chrome.storage.local.set = async () => { throw new Error('quota exhausted'); };
+    __emit(harEntry({ url: 'https://example.test/storage-full', content: '{}' }));
+  });
+  await failedWrite.page.locator('#requestList li[data-id]').first().click();
+  await failedWrite.page.click('#saveBtn');
+  includes('failed Save keeps the storage error visible', await failedWrite.page.textContent('#toastText'), 'quota exhausted');
+  await failedWrite.page.keyboard.press('Control+s');
+  includes('failed save shortcut keeps the storage error visible', await failedWrite.page.textContent('#toastText'), 'quota exhausted');
+  await failedWrite.page.click('#moreBtn');
+  await failedWrite.page.click('#dupBtn');
+  includes('failed duplicate autosave keeps the storage error visible', await failedWrite.page.textContent('#toastText'), 'quota exhausted');
+  check('storage write failures are handled', failedWrite.errors, []);
+  await failedWrite.page.close();
 
   if (process.env.SCREENSHOT) await page.screenshot({ path: process.env.SCREENSHOT });
   check('no uncaught panel errors', errors, []);

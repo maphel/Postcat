@@ -247,3 +247,168 @@ test('captureInfo: time, resource type and duration, without a valid date just "
   assert.match(lib.captureInfo({ startedDateTime: '2026-09-23T10:00:00Z', resourceType: 'xhr' }), /^Captured \S+.* · xhr$/);
   assert.strictEqual(lib.captureInfo({}), 'Captured');
 });
+
+test('HAR metadata keeps failures and redirects and tolerates absent optional fields', () => {
+  const request = { method: 'GET', url: 'https://a.test/' };
+  const minimal = lib.fromHarEntry({ request });
+  assert.strictEqual(minimal.headersText, '');
+  assert.strictEqual(minimal.body, '');
+  assert.strictEqual(minimal.resourceType, '');
+  assert.deepStrictEqual(minimal.recorded.headers, []);
+  assert.strictEqual(minimal.recorded.location, '');
+  const redirect = lib.fromHarEntry({
+    request, response: { status: 302, bodySize: 7, headers: [{ name: 'Location', value: '/new' }], _error: 'net::ERR_FAILED' },
+  });
+  assert.strictEqual(redirect.recorded.location, '/new');
+  assert.strictEqual(redirect.recorded.size, 7);
+  assert.strictEqual(redirect.recorded.error, 'net::ERR_FAILED');
+  const zero = lib.fromHarEntry({ request, response: { bodySize: 7, content: { size: 0 } } });
+  assert.strictEqual(zero.recorded.size, 0);
+});
+
+test('filters handle flags, method matching, empty resource types and nonmatches', () => {
+  const item = { method: 'POST', url: 'https://a.test/Users' };
+  assert.ok(lib.compileFilter('POST https://a.test')(item));
+  assert.ok(lib.compileFilter('/users/igy')(item));
+  assert.ok(!lib.compileFilter('/users/')(item));
+  assert.ok(!lib.compileFilter('/users/invalid')(item));
+  assert.ok(lib.isXhrLike({ _resourceType: '' }));
+  assert.ok(!lib.isXhrLike({ _resourceType: 'document' }));
+});
+
+test('body sniffing covers supported binary signatures and short unknown data', () => {
+  const bytes = (text) => Uint8Array.from(text, (char) => char.charCodeAt(0));
+  for (const [signature, mime] of [
+    ['RIFF\0\0\0\0WAVE', 'audio/wav'], ['\0\0\0\x20ftypM4A ', 'audio/mp4'],
+    ['\0\0\0\x20ftypavis', 'image/avif'], ['\x1a\x45\xdf\xa3', 'video/webm'],
+    ['OggS', 'audio/ogg'], ['ID3\0', 'audio/mpeg'], ['fLaC', 'audio/flac'],
+    ['wOFF', 'font/woff'], ['\0\x01\0\0', 'font/ttf'], ['OTTO', 'font/otf'],
+    ['\0\0\x01\0', 'image/x-icon'], ['BM\0\0', 'image/bmp'], ['PK\x03\x04', 'application/zip'],
+    ['\x1f\x8b\0\0', 'application/gzip'],
+  ]) assert.strictEqual(lib.sniffMime(bytes(signature)), mime, mime);
+  for (const signature of ['', 'a', 'ID3', '\xff\xfb\x00\0', '\xff\xeb\x90\0', '\xff\xfb\xf0\0']) {
+    assert.strictEqual(lib.sniffMime(bytes(signature)), '', JSON.stringify(signature));
+  }
+});
+
+test('body classification handles every preview family and empty or invalid input', () => {
+  for (const [mime, expected] of [
+    ['application/xhtml+xml', 'html'], ['application/vnd.ms-fontobject', 'font'],
+    ['application/x-font-ttf', 'font'], ['application/custom+json', 'json'],
+    ['application/jsonl', 'text'], ['application/graphql', 'text'],
+    ['application/custom+xml', 'text'], ['application/x-custom', 'binary'],
+  ]) assert.strictEqual(lib.previewKind(mime), expected, mime);
+  assert.strictEqual(lib.cleanMime('  Text/Plain ; charset=UTF-8'), 'text/plain');
+  assert.strictEqual(lib.cleanMime(), '');
+  const empty = lib.describeBody({ base64: '', mime: '' });
+  assert.deepStrictEqual([empty.kind, empty.text, empty.size], ['text', '', 0]);
+  const binary = lib.describeBody({ bytes: new Uint8Array([0, 1, 2, 0xff]), mime: 'application/octet-stream' });
+  assert.deepStrictEqual([binary.kind, binary.text, binary.size], ['binary', null, 4]);
+  const textAsMedia = lib.describeBody({ text: '<svg/>', mime: 'image/png' });
+  assert.deepStrictEqual([...textAsMedia.bytes], [...new TextEncoder().encode('<svg/>')]);
+  assert.strictEqual(textAsMedia.kind, 'image');
+  assert.throws(() => lib.describeBody({ base64: '%%%invalid', mime: 'image/png' }));
+  assert.strictEqual(lib.hexDump(new Uint8Array()), '');
+  assert.strictEqual(lib.fileNameFor('invalid URL', 'text/plain'), 'response.txt');
+  assert.strictEqual(lib.fileNameFor('https://a.test/a%2Fb%3Fc', 'text/plain'), 'a_b_c.txt');
+});
+
+test('UTF-8 detection checks malformed bytes and all multibyte sample boundaries', () => {
+  assert.ok(lib.looksLikeText(new Uint8Array()));
+  assert.ok(!lib.looksLikeText(new Uint8Array([0xff])));
+  assert.ok(!lib.looksLikeText(new Uint8Array([0xc3])));
+  assert.ok(!lib.looksLikeText(new Uint8Array([0x61, 0, 0x62])));
+  for (const char of ['ä', '€', '😀']) {
+    for (let padding = 0; padding < 4; padding++) {
+      const bytes = new TextEncoder().encode('x'.repeat(padding) + char.repeat(40000));
+      assert.ok(lib.looksLikeText(bytes), `${char}, padding ${padding}`);
+    }
+  }
+  assert.ok(lib.looksLikeText(new TextEncoder().encode('x'.repeat(70000))));
+});
+
+test('shellSplit covers quote joining, escapes, empty arguments and malformed quotes', () => {
+  assert.deepStrictEqual(lib.shellSplit(''), []);
+  assert.deepStrictEqual(lib.shellSplit("a''b \"\" c\\ d \\\r\n e"), ['ab', '', 'c d', 'e']);
+  assert.deepStrictEqual(lib.shellSplit("$'\\x41\\u0042\\t\\r\\n'"), ['AB\t\r\n']);
+  assert.deepStrictEqual(lib.shellSplit('"keep\\q and \\"quotes\\""'), ['keep\\q and "quotes"']);
+  for (const source of ["'missing", '"missing', "normal 'missing"]) assert.throws(() => lib.shellSplit(source), /Unterminated quote/);
+});
+
+test('parseCurl covers long equals options, explicit headers, auth and upload precedence', () => {
+  const json = lib.parseCurl("curl --url=https://a.test --request=PATCH --header='Content-Type: custom/json' --json='{}'");
+  assert.strictEqual(json.url, 'https://a.test');
+  assert.strictEqual(json.method, 'PATCH');
+  assert.strictEqual(json.body, '{}');
+  assert.deepStrictEqual(json.headers, [{ name: 'Content-Type', value: 'custom/json' }, { name: 'Accept', value: 'application/json' }]);
+  const explicit = lib.parseCurl("curl https://a.test --json '{}' -H 'Accept: text/plain'");
+  assert.strictEqual(explicit.headers.filter((h) => h.name.toLowerCase() === 'accept').length, 1);
+  const mapped = lib.parseCurl("curl https://a.test -A Agent -e https://ref.test -b sid=1 -H bad -H ';'");
+  assert.deepStrictEqual(mapped.headers, [
+    { name: 'User-Agent', value: 'Agent' }, { name: 'Referer', value: 'https://ref.test' }, { name: 'Cookie', value: 'sid=1' },
+  ]);
+  assert.strictEqual(lib.parseCurl('curl -T file.bin -X PATCH https://a.test').method, 'PATCH');
+  assert.strictEqual(lib.parseCurl("curl --data-urlencode 'q=a b' --data-urlencode 'c d' https://a.test").body, 'q=a%20b&c%20d');
+  assert.strictEqual(lib.parseCurl("curl -F 'flag' -F 'f=<data.txt' https://a.test").method, 'POST');
+  assert.strictEqual(lib.parseCurl('curl -X').url, '');
+  assert.strictEqual(lib.parseCurl('curl -X').method, 'GET');
+});
+
+test('JSON validation locates string, escape, separator and root syntax errors', () => {
+  const invalid = [
+    ['{"x":"\\z"}', 'Bad escape in string'], ['{"x":"\\u12Q4"}', 'Bad \\u escape in string'],
+    ['{"x":"abc}', 'Unterminated string'], ['{"x" 1}', "Expected ':'"],
+    ['[1 2]', "Expected ',' or ']'"], ['{"x":1 "y":2}', "Expected ',' or '}'"],
+    ['[true,null,false,{"x":"\\u0041\\n\\t\\\\\\""},[]] x', 'Unexpected content after the JSON value'],
+    ['[] x', 'Unexpected content after the JSON value'],
+  ];
+  for (const [source, message] of invalid) {
+    const error = lib.jsonError(source);
+    assert.ok(error.message.startsWith(message), `${source}: ${error.message}`);
+    assert.strictEqual(error.line, 1);
+    assert.ok(error.column >= 1 && error.column <= source.length + 1);
+  }
+  for (const source of ['0', 'null', 'true', '"text"', '{}', '[]', '{"x":[1,2.5e-3]}']) assert.strictEqual(lib.jsonError(source), null);
+});
+
+test('formatting and failure descriptions handle boundaries without misleading values', () => {
+  for (const n of [-1, Infinity, -Infinity, NaN]) {
+    assert.strictEqual(lib.formatBytes(n), '');
+    assert.strictEqual(lib.formatTime(n), '');
+  }
+  assert.strictEqual(lib.formatBytes(0), '0 B');
+  assert.strictEqual(lib.formatBytes(1024), '1.0 KB');
+  assert.strictEqual(lib.formatTime(0), '0 ms');
+  assert.strictEqual(lib.formatTime(1000), '1.00 s');
+  assert.match(lib.fetchErrorMessage('Failed to fetch', 'not a URL'), /^Couldn’t reach not a URL\./);
+  assert.strictEqual(lib.fetchErrorMessage({ name: 'AbortError' }, ''), 'AbortError');
+  assert.strictEqual(lib.fetchErrorMessage(null, ''), 'Unknown error');
+  assert.strictEqual(lib.fetchErrorMessage(null, '', { cancelled: true, timedOut: true, online: false }), 'Request cancelled.');
+});
+
+test('deterministic cURL round trips preserve literal request data', () => {
+  let seed = 0x150ab;
+  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed; };
+  const chars = ['a', 'b', ' ', '\n', '\r', '\t', "'", '"', '\\', '^', '&', '|', '<', '>', '%', '$', '`', '😀', 'é'];
+  for (let i = 0; i < 1000; i++) {
+    const body = Array.from({ length: random() % 64 }, () => chars[random() % chars.length]).join('');
+    const request = {
+      method: 'POST', url: 'https://a.test/?x=1&literal=^%23',
+      headers: [{ name: 'Content-Type', value: 'text/plain' }, { name: 'X-Empty', value: '' }], body,
+    };
+    assert.deepStrictEqual(lib.parseCurl(lib.toCurl(request)), request, `case ${i}`);
+  }
+});
+
+test('JSON formatting preserves values, token text and formatting idempotence', () => {
+  const values = [null, true, false, 0, -1, 1.5, 'quotes " slash \\ newline\n emoji 😀', [], {}, [1, 'x'], { 'odd:key': ' :{}[] ' }];
+  for (let i = 0; i < 200; i++) {
+    const value = { index: i, current: values[i % values.length], nested: [values[(i * 7) % values.length], { flag: i % 2 === 0 }] };
+    const source = JSON.stringify(value);
+    const { text, json } = lib.formatBody(source);
+    assert.ok(json);
+    assert.deepStrictEqual(JSON.parse(text), value);
+    assert.strictEqual(lib.prettyBody(text), text);
+    assert.strictEqual(lib.tokenizeJson(text).map(([, part]) => part).join(''), text);
+  }
+});

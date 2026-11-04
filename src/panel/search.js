@@ -37,7 +37,7 @@ export function refreshSearch() {
   search.ranges = [];
   search.index = -1;
   const root = searchRoot();
-  const query = search.query.toLowerCase();
+  const query = search.query;
   if (root && query) {
     // Concatenate text nodes so matches may span JSON-highlighting spans.
     const nodes = [];
@@ -47,7 +47,9 @@ export function refreshSearch() {
       nodes.push({ node: n, start: text.length });
       text += n.data;
     }
-    const lower = text.toLowerCase();
+    // Case conversion can change string length (İ → i + combining dot), so offsets must
+    // come from matches in the original text. Escape the query: search is literal.
+    const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu');
     const locate = (pos) => {
       let lo = 0;
       let hi = nodes.length - 1;
@@ -58,9 +60,10 @@ export function refreshSearch() {
       }
       return { node: nodes[lo].node, offset: pos - nodes[lo].start };
     };
-    for (let at = lower.indexOf(query); at !== -1 && search.ranges.length < MAX_MATCHES; at = lower.indexOf(query, at + query.length)) {
-      const start = locate(at);
-      const end = locate(at + query.length - 1);
+    for (const match of text.matchAll(pattern)) {
+      if (search.ranges.length >= MAX_MATCHES) break;
+      const start = locate(match.index);
+      const end = locate(match.index + match[0].length - 1);
       const range = document.createRange();
       range.setStart(start.node, start.offset);
       range.setEnd(end.node, end.offset + 1);

@@ -7,6 +7,7 @@ import { renderList, endRename } from './list.js';
 import { renderEditor } from './editor.js';
 import { clamp, layoutMode, showScreen } from './layout.js';
 import { requestOf, abandonSend } from './sending.js';
+import { trimCaptured } from './capture.js';
 
 // `reveal` opens the detail screen in the narrow layout (a click on a row, a new request);
 // keyboard movement through the list keeps the current screen.
@@ -23,16 +24,15 @@ export async function save() {
   const item = current();
   if (!item) return;
   if (item.kind === 'saved') {
-    await persistSaved();
-    toast('Saved');
+    if (await persistSaved()) toast('Saved');
     return;
   }
   const copy = copyOf(item, 'saved');
   state.saved.unshift(copy);
-  await persistSaved();
+  const saved = await persistSaved();
   switchTab('saved');
   select(copy.id);
-  toast('Saved', { label: 'Rename', run: rename }); // the one place that teaches the rename gesture
+  if (saved) toast('Saved', { label: 'Rename', run: rename }); // the one place that teaches the rename gesture
 }
 
 // Inline rename of the selected saved request: its list row shows an input (list.js). The narrow
@@ -58,9 +58,10 @@ export async function duplicate() {
   }
   const list = lists()[item.kind];
   list.splice(list.indexOf(item), 0, copy);
-  if (item.kind === 'saved') await persistSaved();
+  const saved = item.kind !== 'saved' || await persistSaved();
   select(copy.id);
-  toast('Duplicated');
+  if (item.kind === 'captured') trimCaptured();
+  if (saved) toast('Duplicated');
 }
 
 export function reset() {
@@ -105,6 +106,7 @@ export function remove() {
       if (item.kind === 'saved') persistSaved();
       switchTab(item.kind);
       select(item.id);
+      if (item.kind === 'captured') trimCaptured();
     },
   });
 }
@@ -130,6 +132,7 @@ export function clearCaptured() {
       for (const [id, response] of responses) state.responses.set(id, response);
       switchTab('captured');
       if (state.selectedId === null && cleared.some((i) => i.id === selectedBefore)) select(selectedBefore);
+      trimCaptured();
     },
   });
 }
@@ -151,7 +154,9 @@ export function newRequest(from) {
     body: from?.body || '',
   };
   state.saved.unshift(item);
-  persistSaved();
+  persistSaved().then((saved) => {
+    if (from && saved) toast('Imported from cURL');
+  });
   setFilter('');
   switchTab('saved');
   select(item.id, { reveal: true });
@@ -161,12 +166,13 @@ export function newRequest(from) {
 
 // null: not a curl command; false: a curl command we couldn't read; else the parsed request.
 export function tryParseCurl(text) {
-  if (!/^\s*curl\s/i.test(text)) return null;
   try {
     const parsed = parseCurl(text);
-    return parsed?.url ? parsed : false;
+    return parsed ? (parsed.url ? parsed : false) : null;
   } catch {
-    return false;
+    // A broken cURL command gets a notice; unrelated clipboard text is left to the browser.
+    const command = /^\s*(?:"([^"]*)"|'([^']*)'|(\S+))/.exec(text);
+    return /(^|[\\/])curl(\.exe)?$/i.test(command?.[1] || command?.[2] || command?.[3] || '') ? false : null;
   }
 }
 

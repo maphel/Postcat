@@ -265,6 +265,7 @@ function renderBody(raw) {
 
 function renderPreview(model, url) {
   clearPreview();
+  shownText = model.text ?? null;
   $('resBody').hidden = true;
   const root = $('resPreview');
   root.hidden = false;
@@ -363,8 +364,9 @@ function renderPreview(model, url) {
 
 function formatDuration(seconds) {
   if (!Number.isFinite(seconds)) return '';
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
+  const rounded = Math.round(seconds);
+  const m = Math.floor(rounded / 60);
+  const s = rounded % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
