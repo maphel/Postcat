@@ -1,0 +1,31 @@
+Capture a request, change what matters, and send it again — inside Chrome DevTools.
+
+Postcat is a compact API client for debugging the page you are inspecting. Open DevTools, switch to the Postcat tab, and work with the network traffic already in front of you.
+
+CAPTURE AND EDIT
+• Record requests and response bodies from the inspected tab while DevTools is open.
+• Import requests already recorded by the DevTools Network panel.
+• Edit the method, URL, query parameters, headers and body.
+• Validate and format JSON, edit headers as a table or bulk text, and import or copy cURL commands.
+
+REPLAY AND INSPECT
+• Send HTTP and HTTPS requests from the extension, including to local development servers.
+• Set request headers such as Cookie, Origin and User-Agent explicitly in the editor.
+• Compare the recorded response with the last replay, inspect status and timing, and cancel a running request.
+• Read highlighted JSON or text, inspect binary data as hex, and preview supported images, SVG, media, PDF, fonts and sandboxed HTML.
+• Search responses and save response bodies as files.
+
+KEEP YOUR WORK CLOSE
+• Save requests in a local collection with autosave, names and undo.
+• Use a layout that adapts to bottom or side docking, with light, dark and system appearance.
+• Send, save and navigate with keyboard shortcuts.
+
+PRIVACY
+Postcat has no backend, analytics or telemetry. Captured traffic is processed locally; saved requests and settings use local browser storage without cloud sync. Saved request data is plain text, including any credentials it contains. Replays transmit the data in the editor to the chosen server and follow redirects. HTML Preview can load resources referenced by the response. The developer does not receive your captured traffic through the extension. See the privacy policy for details.
+
+GOOD TO KNOW
+Recording requires DevTools to be open. The browser's cookie jar is not used by replays: cookies are sent only when included in the request editor. Some streamed responses are unavailable from DevTools, and multipart uploads may not replay byte-for-byte. Response bodies have size limits.
+
+Getting started: open DevTools on a page and select the Postcat tab. If the tab is hidden, look in the DevTools overflow menu.
+
+Source code, documentation and issue tracker: https://github.com/maphel/Postcat

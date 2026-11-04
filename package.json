@@ -39,7 +39,7 @@
     "chrome-extension",
     "devtools",
     "http",
-    "postman",
+    "api-testing",
     "api-client"
   ],
   "homepage": "https://github.com/maphel/Postcat",

@@ -1,0 +1,1 @@
+Postcat lets developers capture, edit and replay HTTP requests inside Chrome DevTools to debug the network behavior of the inspected page.

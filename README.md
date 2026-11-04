@@ -4,7 +4,7 @@
 
 [![check](https://github.com/maphel/Postcat/actions/workflows/check.yml/badge.svg)](https://github.com/maphel/Postcat/actions/workflows/check.yml)
 
-A small Postman inside Chrome DevTools. Postcat records the requests of the page you are
+An API client inside Chrome DevTools. Postcat records the requests of the page you are
 inspecting, lets you edit and resend them, and keeps the ones you need in a collection.
 
 ![Postcat panel docked at the bottom of DevTools: captured requests on the left, request editor and highlighted JSON response on the right](docs/screenshot.png)
@@ -23,8 +23,10 @@ The same two views in the dark appearance: [bottom](docs/screenshot-dark.png), [
   hex for anything else. Search with ⌘F, save the body as a file.
 - **Keep** – a saved collection with autosave and undo.
 
-Works in Chrome, Brave and other Chromium browsers (version 116 or newer). Everything stays on
-your machine: no backend, no telemetry (see `SECURITY.md`).
+Works in Chrome, Brave and other Chromium browsers (version 116 or newer). Saved requests and
+settings stay in your browser: no backend, no telemetry. Replays contact the servers you choose;
+HTML Preview can load resources referenced by the response. See the [privacy policy](docs/privacy.md)
+and `SECURITY.md`.
 
 ## Install
 
@@ -121,6 +123,7 @@ npm run pack        # dist/postcat-<version>.zip
 npm run stamp       # src/build-info.js (git-ignored): the panel's version line names the commit, branch and time
 npm run release <version>  # release branch: version bump + changelog; `npm run release tag` after the merge
 npm run screenshot  # docs/screenshot*.png for this README (bottom and side docking, light and dark)
+npm run screenshot -- --store  # docs/store/screenshots/*.png for the Chrome Web Store
 ```
 
 When testing a branch as an unpacked extension, `npm run stamp` before reloading it turns the

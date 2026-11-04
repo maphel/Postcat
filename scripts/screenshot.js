@@ -2,7 +2,8 @@
 // screenshot.png) and at a side-docked size (380 × 480, screenshot-side.png), each in the light and
 // the dark appearance (-dark suffix). The scene is the same for all four: a few captured requests,
 // one of them selected, its Headers tab open and one replayed JSON response. Uses the same harness
-// as test/e2e.js (stubbed chrome.devtools) in Playwright's Chromium.
+// as test/e2e.js (stubbed chrome.devtools) in Playwright's Chromium. With --store, renders the
+// Chrome Web Store sizes (1280 × 800 and 640 × 400) into docs/store/screenshots/ instead.
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -10,9 +11,14 @@ import { buildExtension, launch, openPanel, harEntry, waitForRows, waitForSendDo
 
 const root = path.join(import.meta.dirname, '..');
 const docs = path.join(root, 'docs');
+const store = process.argv.includes('--store');
+const output = store ? path.join(docs, 'store', 'screenshots') : docs;
 const PORT = 8766;
 
-const SIZES = [
+const SIZES = store ? [
+  { name: 'postcat-wide', width: 1280, height: 800 },
+  { name: 'postcat-compact', width: 640, height: 400 },
+] : [
   { name: 'screenshot', width: 1024, height: 320 },      // docked at the bottom: wide layout
   { name: 'screenshot-side', width: 380, height: 480 },  // docked to the side: narrow layout
 ];
@@ -24,6 +30,21 @@ const cat = {
   owner: { email: 'mia@example.test', verified: true },
   weightKg: 4.2,
   adoptedAt: null,
+  ...(store ? {
+    profile: {
+      breed: 'Domestic shorthair',
+      color: 'Tabby',
+      birthday: '2022-04-12',
+      favoriteToys: ['Feather wand', 'Cardboard box'],
+    },
+    care: {
+      food: 'Salmon',
+      feedingTimes: ['08:00', '18:00'],
+      lastCheckup: '2026-10-10',
+      vaccinations: { rabies: true, fvrcp: true },
+    },
+    links: { self: '/api/cats/42', photos: '/api/cats/42/photos' },
+  } : {}),
 };
 
 const server = http.createServer((req, res) => {
@@ -34,7 +55,7 @@ const server = http.createServer((req, res) => {
 
 // The captured requests, newest first in the list: the selected one (a PATCH with a JSON body)
 // is emitted last so it sits at the top.
-function emitScene(port) {
+function emitScene({ port, store }) {
   const base = `http://localhost:${port}`;
   const call = (method, url, status, time, body) => harEntry({
     method, url: base + url, status, time, body,
@@ -48,10 +69,23 @@ function emitScene(port) {
     content: '{"id":42,"name":"Mittens"}',
   });
   __emit(call('GET', '/api/cats?page=1&limit=20', 200, 83));
+  if (store) {
+    __emit(call('GET', '/api/cats?tag=indoor', 200, 71));
+    __emit(call('GET', '/api/adoptions', 200, 109));
+    __emit(call('POST', '/api/cats/42/photos', 201, 126, '{"title":"At home"}'));
+    __emit(call('GET', '/api/cats/42/care', 200, 54));
+    __emit(call('PUT', '/api/cats/42/tags', 200, 87, '{"tags":["cat","indoor"]}'));
+  }
   __emit(call('POST', '/api/cats', 201, 142, '{"name":"Mittens","tags":["cat","indoor"]}'));
   __emit(call('GET', '/api/cats/42/photos', 200, 61));
   __emit(call('DELETE', '/api/cats/7', 404, 51));
-  __emit(call('PATCH', '/api/cats/42', 200, 96, '{"name":"Mittens","weightKg":4.2}'));
+  const update = { name: 'Mittens', weightKg: 4.2 };
+  if (store) {
+    update.tags = ['cat', 'indoor'];
+    update.owner = { email: 'mia@example.test', verified: true };
+    update.care = { food: 'Salmon', feedingTimes: ['08:00', '18:00'] };
+  }
+  __emit(call('PATCH', '/api/cats/42', 200, 96, JSON.stringify(update, null, store ? 2 : 0)));
 }
 
 // Appearance through the panel's own control: the Options menu closes itself after the click.
@@ -72,7 +106,7 @@ async function setAppearance(page, value) {
 async function shoot(page, file) {
   await page.evaluate(() => document.activeElement?.blur());
   await page.mouse.move(0, 0);
-  const out = path.join(docs, file);
+  const out = path.join(output, file);
   await page.screenshot({ path: out });
   console.log(`${path.relative(root, out)}  ${(fs.statSync(out).size / 1024).toFixed(1)} KB`);
 }
@@ -81,16 +115,16 @@ await new Promise((r) => server.listen(PORT, r));
 const { dir, cleanup } = buildExtension();
 const { ctx, id } = await launch(dir);
 try {
-  fs.mkdirSync(docs, { recursive: true });
+  fs.mkdirSync(output, { recursive: true });
   for (const { name, width, height } of SIZES) {
     const { page } = await openPanel(ctx, id, { width, height });
-    await page.evaluate(emitScene, PORT);
-    await waitForRows(page, 5);
+    await page.evaluate(emitScene, { port: PORT, store });
+    await waitForRows(page, store ? 10 : 5);
     // Start light: the stubbed DevTools reports a dark theme, which 'system' would follow.
     await setAppearance(page, 'light');
     // A click opens the detail screen in the narrow layout; the send then reveals the response there.
     await page.locator('#requestList li[data-id]').first().click();
-    await page.click('#reqTabs button[data-tab=headers]');
+    await page.click(`#reqTabs button[data-tab=${store ? 'body' : 'headers'}]`);
     await page.click('#sendBtn');
     await waitForSendDone(page);
     await shoot(page, `${name}.png`);
