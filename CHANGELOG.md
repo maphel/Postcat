@@ -7,6 +7,8 @@ All notable changes to Postcat are listed here. The format is based on
 
 <!-- Entries go under ### Added / ### Changed / ### Fixed / ### Removed; add only the subsections you need. -->
 
+## 0.2.1 — 2026-11-04
+
 ### Changed
 - Describe Postcat as an API client in DevTools and document its privacy practices for the Chrome Web Store.
 
