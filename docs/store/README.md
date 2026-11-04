@@ -4,6 +4,18 @@ This folder prepares the first manual, **Unlisted** submission for
 [issue #17](https://github.com/maphel/Postcat/issues/17). It does not publish an item or automate
 uploads. Keep the listing, privacy policy and dashboard declarations aligned with the code.
 
+## Current draft
+
+Prepared in the Developer Dashboard on 4 November 2026:
+
+- Item ID: `bmhjhdigonoppemjphobiinpnhmjdgbo`.
+- [Open the draft](https://chrome.google.com/webstore/devconsole/43a0ed5f-3843-47c6-a051-82137c3c3547/bmhjhdigonoppemjphobiinpnhmjdgbo/edit)
+  (publisher account required).
+- Distribution is **Unlisted** and free; listing language is English and category is Developer Tools.
+- The icon and all four screenshots are saved, and the contact email is verified.
+- Data-use categories and the three data-use certifications remain unselected for maintainer review.
+  The draft is not ready for submission until these declarations and remaining validation are complete.
+
 ## Files to upload or copy
 
 | Dashboard field | Source |
@@ -14,7 +26,8 @@ uploads. Keep the listing, privacy policy and dashboard declarations aligned wit
 | Detailed description | [long-description.txt](long-description.txt) |
 | Single purpose | [single-purpose.txt](single-purpose.txt) |
 | Permission explanations and remote code | [permissions.md](permissions.md) |
-| Optional reviewer notes and test steps | [reviewer-notes.txt](reviewer-notes.txt) |
+| Test instructions (500-character dashboard field) | [test-instructions.txt](test-instructions.txt) |
+| Additional reviewer context | [reviewer-notes.txt](reviewer-notes.txt) |
 | Store icon | [`icons/icon128.png`](../../icons/icon128.png), 128×128 |
 | Screenshots | [`screenshots/`](screenshots/), 1280×800 and 640×400, light and dark |
 | Privacy policy | [`docs/privacy.md`](../privacy.md) |
@@ -73,6 +86,8 @@ after the first manual submission succeeds; no CI or secret configuration is inc
 
 - [Prepare images](https://developer.chrome.com/docs/webstore/images): icon and screenshot sizes.
 - [Create a great listing](https://developer.chrome.com/docs/webstore/best-listing): listing assets.
+- [Trader disclosure](https://developer.chrome.com/docs/webstore/program-policies/trader-disclosure):
+  publisher self-declaration and contact information requirements.
 - [User data FAQ](https://developer.chrome.com/docs/webstore/program-policies/user-data-faq),
   especially questions 3 and 14 on local processing and question 15 on clients connecting to
   user-specified servers. These explain why no telemetry does not mean no privacy disclosure.
