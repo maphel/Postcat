@@ -5,7 +5,8 @@ function shellQuote(value) {
 }
 
 export function toCurl({ method, url, headers, body }) {
-  const parts = [`curl -X ${method} ${shellQuote(url)}`];
+  const methodArg = /^[a-z0-9_-]+$/i.test(method) ? method : shellQuote(method);
+  const parts = [`curl -X ${methodArg} ${shellQuote(url)}`];
   // curl treats "-H 'X: '" as "remove X"; "-H 'X;'" sends an empty header.
   for (const h of headers) parts.push(`-H ${shellQuote(h.value === '' ? `${h.name};` : `${h.name}: ${h.value}`)}`);
   if (body) parts.push(`--data-raw ${shellQuote(body)}`);
@@ -19,6 +20,14 @@ const ANSI_ESCAPES = { n: '\n', t: '\t', r: '\r', '\\': '\\', "'": "'", '"': '"'
 // Chrome's "Copy as cURL (cmd)" uses ^ as the escape character and ^ + newline as continuation.
 // Recognised by those continuations or by ^-escaped quotes/ampersands; converted to POSIX quoting.
 function isCmdSyntax(input) {
+  // A POSIX single-quoted argument is unambiguous. Carets inside it are literal,
+  // even when its contents happen to look like cmd escapes or continuations.
+  let doubleQuoted = false;
+  for (let i = 0; i < input.length; i++) {
+    if (input[i] === '\\') { i++; continue; }
+    if (input[i] === '"') doubleQuoted = !doubleQuoted;
+    if (input[i] === "'" && !doubleQuoted) return false;
+  }
   return /\^\s*\r?\n/.test(input) || /\^"/.test(input) || /\^[&|<>%]/.test(input);
 }
 
@@ -65,14 +74,19 @@ export function shellSplit(input) {
       while (i < input.length && input[i] !== "'") {
         if (input[i] === '\\') {
           const n = input[i + 1];
-          if (n === 'x') { cur += String.fromCharCode(parseInt(input.substr(i + 2, 2), 16)); i += 4; continue; }
-          if (n === 'u') { cur += String.fromCharCode(parseInt(input.substr(i + 2, 4), 16)); i += 6; continue; }
+          if (n === 'x' || n === 'u') {
+            const digits = /^[0-9a-f]+/i.exec(input.slice(i + 2, i + (n === 'x' ? 4 : 6)))?.[0];
+            cur += digits ? String.fromCharCode(parseInt(digits, 16)) : `\\${n}`;
+            i += 2 + (digits?.length || 0);
+            continue;
+          }
           cur += ANSI_ESCAPES[n] ?? n;
           i += 2;
         } else {
           cur += input[i++];
         }
       }
+      if (i >= input.length) throw new Error('Unterminated quote');
       i++;
       inWord = true;
     } else if (c === "'") {
@@ -120,11 +134,15 @@ const CURL_VALUE_FLAGS = new Set([
   '--speed-time', '-y', '-Y', '--pinnedpubkey', '--crlfile', '--engine', '--netrc-file', '--proto',
   '--proto-redir', '--proxy-header', '--noproxy', '--output-dir', '--etag-save', '--etag-compare',
   '--aws-sigv4', '--delegation', '--krb', '--service-name', '--tlsuser', '--tlspassword', '--tlsauthtype',
-  '--form-string', '--doh-url', '--alt-svc', '--hsts', '--ipfs-gateway', '--variable', '--ca-native',
+  '--form-string', '--doh-url', '--alt-svc', '--hsts', '--ipfs-gateway', '--variable',
 ]);
 
 function headerFrom(line) {
   const idx = line.indexOf(':');
+  if (idx === -1 && line.trim().endsWith(';')) {
+    const name = line.trim().slice(0, -1).trim();
+    return name ? { name, value: '' } : null;
+  }
   return idx > 0 ? { name: line.slice(0, idx).trim(), value: line.slice(idx + 1).trim() } : null;
 }
 
@@ -205,7 +223,11 @@ export function parseCurl(text) {
 
   let body = data.join('&');
   if (asGet && body) {
-    url += (url.includes('?') ? '&' : '?') + body;
+    const hashIdx = url.indexOf('#');
+    const hash = hashIdx === -1 ? '' : url.slice(hashIdx);
+    const base = hashIdx === -1 ? url : url.slice(0, hashIdx);
+    const separator = base.includes('?') ? (/[?&]$/.test(base) ? '' : '&') : '?';
+    url = base + separator + body + hash;
     body = '';
   }
   const has = (name) => headers.some((h) => h.name.toLowerCase() === name);

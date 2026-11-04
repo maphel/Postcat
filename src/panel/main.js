@@ -1,5 +1,5 @@
 // Entry point: wires DOM events to the modules and boots the panel.
-import { headersToText, textToRows, urlToParams, prettyBody } from '../lib/index.js';
+import { headersToText, textToRows, urlToParams, prettyBody, jsonError } from '../lib/index.js';
 import { state, current } from './state.js';
 import { loadStorage, persistSettings, flushPending } from './storage.js';
 import { $, toast, copyText, isTyping, initMenus, openMenuAt } from './dom.js';
@@ -87,7 +87,7 @@ $('beautifyBtn').addEventListener('click', () => {
   if (!item) return;
   const pretty = prettyBody(item.body);
   if (pretty === item.body) {
-    toast('Body isn’t valid JSON');
+    toast(jsonError(item.body) ? 'Body isn’t valid JSON' : 'Body is already formatted');
     return;
   }
   item.body = pretty;

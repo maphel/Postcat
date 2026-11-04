@@ -108,7 +108,8 @@ function charsetOf(mime) {
 // Decodes with the declared charset (or a UTF-16 BOM), falling back to UTF-8 for unknown names.
 function decodeText(bytes, mime) {
   let charset = charsetOf(mime);
-  if ((bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes[0] === 0xfe && bytes[1] === 0xff)) charset = 'utf-16';
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) charset = 'utf-16le';
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) charset = 'utf-16be';
   if (charset) {
     try {
       return new TextDecoder(charset).decode(bytes);

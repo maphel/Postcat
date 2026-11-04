@@ -3,6 +3,7 @@
 export const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 export const MAX_CAPTURED = 1000;
 export const DEFAULT_LAYOUT = { sidebarW: 214, reqW: 45 };
+export const LAYOUT_LIMITS = { sidebarMin: 180, reqMin: 20, reqMax: 80 };
 export const APPEARANCES = ['system', 'light', 'dark'];
 
 export const state = {

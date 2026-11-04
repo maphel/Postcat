@@ -40,10 +40,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const controller = new AbortController();
   const { sendId, request } = msg;
   controllers.set(sendId, controller);
+  let finished = false;
+  const finish = (result) => {
+    if (finished) return;
+    finished = true;
+    controller.signal.removeEventListener('abort', onAbort);
+    sendResponse(result);
+  };
+  // A queued request can be cancelled without waiting for the active request to finish.
+  // Its queue entry still runs (and sees the aborted signal), preserving serialized rule cleanup.
+  const onAbort = () => finish(errorResult(new Error('Aborted'), request.url, controller));
+  controller.signal.addEventListener('abort', onAbort, { once: true });
   // Serialize sends so one request's header rule can never leak onto another.
   queue = queue
     .then(() => send(request, controller))
-    .then(sendResponse, (err) => sendResponse(errorResult(err, request.url, controller)))
+    .then(finish, (err) => finish(errorResult(err, request.url, controller)))
     .finally(() => controllers.delete(sendId));
   return true;
 });
@@ -70,7 +81,8 @@ async function send({ method, url, headers, body }, controller = new AbortContro
   // fetch() refuses URLs with credentials; curl and Postman turn them into Basic auth.
   if (target.username || target.password) {
     if (!headers.some((h) => h.name.toLowerCase() === 'authorization')) {
-      fetchHeaders.set('Authorization', `Basic ${btoa(`${decodeURIComponent(target.username)}:${decodeURIComponent(target.password)}`)}`);
+      const credentials = `${decodeURIComponent(target.username)}:${decodeURIComponent(target.password)}`;
+      fetchHeaders.set('Authorization', `Basic ${bytesToBase64(new TextEncoder().encode(credentials))}`);
     }
     target.username = '';
     target.password = '';

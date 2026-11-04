@@ -6,7 +6,8 @@
   "description": "Chrome DevTools extension: capture, edit and replay network requests.",
   "scripts": {
     "test": "node --test test/*.test.js",
-    "test:e2e": "node test/e2e.js",
+    "test:e2e": "node test/e2e.js && npm run test:qa",
+    "test:qa": "node test/qa.js && node test/worker-qa.js",
     "test:real": "node test/real-devtools.js",
     "lint": "eslint .",
     "check": "npm run lint && npm test && npm run test:e2e && npm run test:real",

@@ -124,3 +124,67 @@ test('fetchErrorMessage never prints [object Object]', () => {
 test('toCurl exports empty header values the way curl needs them', () => {
   assert.match(lib.toCurl({ method: 'GET', url: 'https://a.test', headers: [{ name: 'X', value: '' }], body: '' }), /-H 'X;'/);
 });
+
+test('describeBody decodes both UTF-16 BOM byte orders', () => {
+  for (const mime of ['', 'application/octet-stream', 'text/plain; charset=utf-8']) {
+    for (const bytes of [new Uint8Array([0xff, 0xfe, 0x68, 0, 0x69, 0]), new Uint8Array([0xfe, 0xff, 0, 0x68, 0, 0x69])]) {
+      const body = lib.describeBody({ bytes, mime });
+      assert.strictEqual(body.kind, 'text', mime);
+      assert.strictEqual(body.text, 'hi', mime);
+      assert.strictEqual(body.size, 6);
+    }
+  }
+});
+
+test('cURL export/import preserves POSIX-quoted carets and empty headers', () => {
+  const bodies = ['literal ^& pipe ^| redirect ^< ^> ^% ^"', "apostrophe's ^&", 'continued ^\nbody'];
+  for (const body of bodies) {
+    const request = {
+      method: 'POST', url: 'https://a.test/?literal=^&x=1',
+      headers: [{ name: 'Content-Type', value: 'text/plain' }, { name: 'X-Empty', value: '' }, { name: 'X-Literal', value: '^&' }],
+      body,
+    };
+    assert.deepStrictEqual(lib.parseCurl(lib.toCurl(request)), request);
+  }
+  // Single quotes in Windows double-quoted values are ordinary content.
+  assert.strictEqual(lib.parseCurl('curl "https://a.test/?x=1^&y=2" ^\n --data-raw "it\'s fine"').body, "it's fine");
+});
+
+test('parseCurl puts --get data before the URL fragment', () => {
+  for (const [url, expected] of [
+    ['https://a.test/path#section', 'https://a.test/path?q=one#section'],
+    ['https://a.test/path?old=1#section', 'https://a.test/path?old=1&q=one#section'],
+    ['https://a.test/path?#section', 'https://a.test/path?q=one#section'],
+  ]) {
+    const request = lib.parseCurl(`curl -G '${url}' -d q=one`);
+    assert.strictEqual(request.url, expected);
+    assert.strictEqual(request.body, '');
+    assert.strictEqual(request.method, 'GET');
+  }
+});
+
+test('parseCurl treats --ca-native as a switch and keeps the URL', () => {
+  assert.strictEqual(lib.parseCurl('curl --ca-native https://a.test/path').url, 'https://a.test/path');
+});
+
+test('shellSplit rejects unterminated ANSI-C quotes like other quote forms', () => {
+  for (const text of ["curl $'https://a.test", "curl https://a.test --data-raw $'abc", "curl $'abc\\'"]) {
+    assert.throws(() => lib.shellSplit(text), /Unterminated quote/);
+  }
+});
+
+test('toCurl shell-quotes custom methods with shell metacharacters', () => {
+  for (const method of ['M$USER', 'M`id`', 'GET; echo unexpected', "M'ETHOD"]) {
+    const command = lib.toCurl({ method, url: 'https://a.test/', headers: [], body: '' });
+    assert.deepStrictEqual(lib.shellSplit(command), ['curl', '-X', method, 'https://a.test/']);
+    assert.ok(command.startsWith("curl -X '"), command);
+  }
+});
+
+test('shellSplit ANSI-C hex escapes consume only their actual digits', () => {
+  for (const [source, expected] of [
+    [String.raw`$'\x4'`, '\x04'], [String.raw`$'\u41'`, 'A'],
+    [String.raw`$'\x41Z'`, 'AZ'], [String.raw`$'\u0041Z'`, 'AZ'],
+    [String.raw`$'\xZ'`, String.raw`\xZ`], [String.raw`$'\u'`, String.raw`\u`],
+  ]) assert.deepStrictEqual(lib.shellSplit(source), [expected], source);
+});

@@ -3,7 +3,7 @@
 // the appearance (theme), and the resizers of the wide layout. Editing state lives in `state` and
 // the DOM stays in place across layout changes, so drafts, selection and response views survive
 // a resize; only focus needs help when the element it sits in is hidden by the new layout.
-import { state, current, DEFAULT_LAYOUT, APPEARANCES } from './state.js';
+import { state, current, DEFAULT_LAYOUT, LAYOUT_LIMITS, APPEARANCES } from './state.js';
 import { persistSettings } from './storage.js';
 import { $, closeMenus } from './dom.js';
 
@@ -130,7 +130,7 @@ export function initLayout() {
   bindResizer(
     $('sidebarResizer'),
     // 180 px keeps the Captured / Saved labels, the record and the New button on one row.
-    (e) => { state.layout.sidebarW = Math.round(clamp(e.clientX, 180, window.innerWidth * 0.45)); },
+    (e) => { state.layout.sidebarW = Math.round(clamp(e.clientX, LAYOUT_LIMITS.sidebarMin, window.innerWidth * 0.45)); },
     () => { state.layout.sidebarW = DEFAULT_LAYOUT.sidebarW; },
   );
   bindResizer(
@@ -138,7 +138,7 @@ export function initLayout() {
     (e) => {
       const rect = $('split').getBoundingClientRect();
       if (!rect.width) return;
-      state.layout.reqW = Math.round(clamp(((e.clientX - rect.left) / rect.width) * 100, 20, 80));
+      state.layout.reqW = Math.round(clamp(((e.clientX - rect.left) / rect.width) * 100, LAYOUT_LIMITS.reqMin, LAYOUT_LIMITS.reqMax));
     },
     () => { state.layout.reqW = DEFAULT_LAYOUT.reqW; },
   );

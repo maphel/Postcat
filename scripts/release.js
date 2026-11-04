@@ -151,9 +151,9 @@ function tag() {
   if (git('tag', '--list', name)) fail(`tag ${name} already exists locally`);
   if (git('ls-remote', '--tags', 'origin', name)) fail(`tag ${name} already exists on origin`);
 
-  // HEAD must be the squashed release commit itself, not something that landed after it.
+  // HEAD must be the release commit itself; GitHub may append the squash PR number.
   const subject = git('log', '-1', '--format=%s');
-  if (!subject.startsWith(`release: ${name}`)) {
+  if (subject.replace(/ \(#\d+\)$/, '') !== `release: ${name}`) {
     fail(`HEAD is "${subject}", not the release commit "release: ${name}". Tag right after merging the release PR, before other PRs land; if main has moved on, prepare a new release instead (npm run release <x.y.z>)`);
   }
   const { sections } = readChangelog();
