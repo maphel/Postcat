@@ -154,7 +154,9 @@ export function newRequest(from) {
     body: from?.body || '',
   };
   state.saved.unshift(item);
-  persistSaved();
+  persistSaved().then((saved) => {
+    if (from && saved) toast('Imported from cURL');
+  });
   setFilter('');
   switchTab('saved');
   select(item.id, { reveal: true });

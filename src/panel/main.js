@@ -295,7 +295,6 @@ document.addEventListener('paste', (e) => {
     return;
   }
   newRequest(parsed);
-  toast('Imported from cURL');
 });
 
 window.postcatSearch = onSearch; // called by devtools.js

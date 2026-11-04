@@ -1032,6 +1032,13 @@ function ok(name, condition, detail) {
   check('storage read failure is handled', offline.errors, []);
   await offline.page.click('#newListBtn');
   includes('saving after a failed read explains how to retry', await offline.page.textContent('#toastText'), 'Reopen DevTools');
+  await offline.page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.setData('text/plain', "curl 'https://example.test/offline-import' --data-raw 'unsaved body'");
+    document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }));
+  });
+  check('cURL paste after a failed read still creates an editable draft', await offline.page.inputValue('#url'), 'https://example.test/offline-import');
+  includes('cURL import never hides a storage read error with a success toast', await offline.page.textContent('#toastText'), 'Reopen DevTools');
   await offline.page.close();
   check('failed reads never overwrite the unread collection or settings', await page.evaluate(() => chrome.storage.local.get(['postcat.saved', 'postcat.settings'])), {
     'postcat.saved': [unread], 'postcat.settings': { filterText: 'unread setting' },
