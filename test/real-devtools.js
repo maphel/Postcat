@@ -11,6 +11,8 @@ import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert';
 import { chromium } from 'playwright';
+import { openVault } from '../src/lib/vault.js';
+import { TEST_PASSPHRASE } from './harness.js';
 
 // The full Chromium (not the headless shell): extensions and DevTools need it.
 const CHROME = process.env.CHROME || chromium.executablePath('chromium');
@@ -126,6 +128,12 @@ const READ_LIST = `(async () => {
     const panel = await connect((await waitForTarget((t) => t.url.endsWith('/panel.html'))).webSocketDebuggerUrl);
     await sleep(500);
 
+    assert.equal(await panel.evaluate(`document.getElementById('recordBtn').getAttribute('aria-pressed')`), 'false');
+    await panel.evaluate(`document.getElementById('recordBtn').click()`);
+    assert.equal(await panel.evaluate(`document.getElementById('captureConsentDialog').open`), true);
+    await panel.evaluate(`document.getElementById('captureConsentAccept').click()`);
+    await sleep(300);
+    assert.equal(await panel.evaluate(`document.getElementById('recordBtn').getAttribute('aria-pressed')`), 'true');
     await panel.evaluate(`document.getElementById('importBtn').click()`);
     await sleep(300);
 
@@ -210,6 +218,33 @@ const READ_LIST = `(async () => {
     console.log('version line:', versionLine, stamped ? '(stamped)' : '(unstamped)');
     assert.ok(versionLine.startsWith(`Postcat ${version}`), versionLine);
     assert.strictEqual(versionLine.includes('·'), stamped, versionLine);
+
+    // The real extension frame can also set up, write and lock its encrypted collection.
+    const vault = await panel.evaluate(`(async () => {
+      const get = (id) => document.getElementById(id);
+      const wait = async (ready, label) => {
+        for (let i = 0; i < 100; i++) {
+          if (ready()) return;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        throw new Error('Timed out waiting for ' + label + ': ' + get('savedError').textContent);
+      };
+      get('saveBtn').click();
+      await wait(() => get('savedDialog').open, 'vault setup');
+      get('savedPassphrase').value = ${JSON.stringify(TEST_PASSPHRASE)};
+      get('savedConfirm').value = ${JSON.stringify(TEST_PASSPHRASE)};
+      get('savedSubmit').click();
+      await wait(() => document.querySelector('#requestList li[data-kind=saved]'), 'encrypted save');
+      const record = (await chrome.storage.local.get('postcat.saved'))['postcat.saved'];
+      get('savedToggle').click();
+      await wait(() => get('savedToggle').textContent === 'Unlock collection', 'vault lock');
+      return { record, remainingRows: document.querySelectorAll('#requestList li[data-id]').length, url: get('url').value };
+    })()`);
+    assert.deepStrictEqual(Object.keys(vault.record).sort(), ['ciphertext', 'iv', 'salt', 'version']);
+    const { records } = await openVault(TEST_PASSPHRASE, vault.record);
+    assert.deepStrictEqual(records.map((request) => request.url), [`http://localhost:${PORT}/api/live`]);
+    assert.deepStrictEqual([vault.remainingRows, vault.url], [0, '']);
+    console.log('encrypted collection saved and locked in real DevTools');
 
     panel.close();
     front.close();

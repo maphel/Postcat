@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
-import { buildExtension, launch, openPanel, waitForSendDone } from './harness.js';
+import { buildExtension, launch, openPanel, harEntry, waitForSendDone, vaultFixture, unlockCollection } from './harness.js';
 
 const MiB = 1024 * 1024;
 
@@ -17,9 +17,10 @@ function gate() {
   };
 }
 
-async function newRequest(page, url) {
-  await page.click('#newListBtn');
-  await page.fill('#url', url);
+async function selectCapture(page, url) {
+  await page.waitForFunction(() => document.getElementById('recordBtn').getAttribute('aria-pressed') === 'true');
+  await page.evaluate((url) => __emit(harEntry({ url })), url);
+  await page.locator('#requestList li[data-id]').filter({ hasText: new URL(url).pathname }).click();
 }
 
 const cancelled = (page) => page.waitForFunction(
@@ -78,15 +79,13 @@ test('worker replay: cancellation isolation, auth, body limits and cleanup', asy
       { method: 'GET', url: `${base}/echo`, headers: [], body: '', ...request });
 
     await t.test('cancelling one panel leaves another panel send untouched', async () => {
-      const [a, b] = await Promise.all([
-        openPanel(ctx, id, { width: 1300, height: 600 }),
-        openPanel(ctx, id, { width: 1300, height: 600 }),
-      ]);
+      const a = await openPanel(ctx, id, { width: 1300, height: 600, storage: { 'postcat.settings': { captureConsent: true } } });
+      const b = await openPanel(ctx, id, { width: 1300, height: 600 });
       const hold = gate();
       gates.set('/panel-a', hold);
       try {
-        await newRequest(a.page, `${base}/panel-a`);
-        await newRequest(b.page, `${base}/panel-b`);
+        await selectCapture(a.page, `${base}/panel-a`);
+        await selectCapture(b.page, `${base}/panel-b`);
         await a.page.click('#sendBtn');
         await hold.started;
         await b.page.click('#sendBtn');
@@ -110,20 +109,47 @@ test('worker replay: cancellation isolation, auth, body limits and cleanup', asy
       const hold = gate();
       gates.set('/queue-blocker', hold);
       try {
-        await newRequest(page, `${base}/queue-blocker`);
+        await selectCapture(page, `${base}/queue-blocker`);
         await page.click('#sendBtn');
         await hold.started;
-        await newRequest(page, `${base}/cancel-queued`);
+        await selectCapture(page, `${base}/cancel-queued`);
         await page.click('#sendBtn');
         await page.click('#sendBtn');
         await cancelled(page);
         assert.equal(await page.textContent('#sendBtn'), 'Send');
         assert.equal(seen.includes('/cancel-queued'), false);
         hold.release();
-        await newRequest(page, `${base}/after-queued-cancel`);
+        await selectCapture(page, `${base}/after-queued-cancel`);
         await page.click('#sendBtn');
         await waitForSendDone(page);
         assert.equal(seen.includes('/cancel-queued'), false);
+        assert.deepEqual(errors, []);
+        await cleanRules();
+      } finally {
+        hold.release();
+        await page.close();
+      }
+    });
+
+    await t.test('locking the vault abandons its active replay without blocking captured replay', async () => {
+      const { page, errors } = await openPanel(ctx, id, { width: 1300, height: 600, storage: await vaultFixture() });
+      const hold = gate();
+      gates.set('/lock-in-flight', hold);
+      try {
+        await unlockCollection(page);
+        await page.click('#newListBtn');
+        await page.fill('#url', `${base}/lock-in-flight`);
+        await page.click('#sendBtn');
+        await hold.started;
+        await page.getByRole('button', { name: 'Lock collection', exact: true }).click();
+        await page.getByRole('button', { name: 'Unlock collection', exact: true }).waitFor();
+        assert.equal(await page.inputValue('#url'), '');
+        assert.equal(await page.locator('#requestList li[data-id]').count(), 0);
+        await page.click('#collectionCaptured');
+        await selectCapture(page, `${base}/after-vault-lock`);
+        await page.click('#sendBtn');
+        await page.waitForFunction(() => document.getElementById('sendBtn').textContent === 'Send'
+          && /^200/.test(document.getElementById('resStatus').textContent), null, { timeout: 3000 });
         assert.deepEqual(errors, []);
         await cleanRules();
       } finally {

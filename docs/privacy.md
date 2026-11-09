@@ -1,17 +1,22 @@
 # Postcat privacy policy
 
-Last updated: 4 November 2026
+Last updated: 9 November 2026
 
 Postcat is an API client inside Chrome DevTools for capturing, editing and replaying network
 requests. This policy describes the extension, not the websites or API servers you inspect.
 
 ## Data Postcat accesses
 
-While DevTools is open and recording is enabled, Postcat reads network requests and responses
-for the inspected tab through the DevTools API. This can include URLs, query parameters, methods,
-headers, request bodies, response bodies, status codes and timing information. Depending on the
-site, those fields may contain personal information, cookies, authentication tokens or other
-confidential content. Imported DevTools logs and cURL commands are processed in the same way.
+Postcat asks before it starts recording or imports the DevTools log for the first time. The
+prompt explains what the extension reads and how it is used. If you choose **Allow capture**,
+Postcat remembers your choice in this browser profile and can start recording when you reopen
+the panel. Use the recording button to pause live capture.
+
+While recording or importing, Postcat reads network requests and responses for the inspected tab
+through the DevTools API. This can include URLs, query parameters, methods, headers, request
+and response bodies, status codes and timing information. Depending on the site, these may contain
+personal information, cookies, authentication tokens or other confidential content. cURL commands
+you paste may contain the same kinds of request data.
 
 Postcat does not use the browser history API or inspect unrelated tabs. It does not access the
 browser's cookie store. A captured request may nevertheless include a Cookie or Authorization
@@ -19,20 +24,28 @@ header supplied by DevTools.
 
 ## Local processing and storage
 
-Captured requests and responses are held in memory while the panel is open. They are not
-automatically written to the saved collection. Creating a new request or pasting a cURL command
-outside an input creates a saved request. Pasting cURL into the URL field updates the selected
-request without changing whether it is captured or saved. Saved requests' names, methods, URLs,
-headers and bodies are stored in `chrome.storage.local`, alongside panel settings such as
-appearance, filter text and layout. Saving a captured request copies it into this collection;
-subsequent edits to saved requests are saved automatically. Response bodies are not persisted
-in the saved collection.
+Captured requests and responses stay in memory while the panel is open. Saving a captured request
+copies its name, method, URL, headers and body to your collection. The collection must be set up
+or unlocked before you can save, create a new request, or paste a cURL command outside an input.
+Pasting cURL into the URL field updates the selected request without changing whether it is captured
+or saved. Edits to saved requests are saved automatically. Before closing DevTools, wait for the
+saving indicator to clear or lock the collection and wait for it to finish. Response bodies stay
+outside the collection.
 
-This storage is local to your browser profile; Postcat does not use `chrome.storage.sync` or
-provide cloud synchronization. Saved requests are stored as plain text, including any credentials
-in their URLs, headers or bodies. Remove information you do not need before saving or sharing a
-request. Saved requests remain until you delete them or remove the extension. You can delete
-requests in the Saved tab. Uninstalling the extension removes its extension storage.
+Postcat encrypts the saved collection with AES-256-GCM before writing it to `chrome.storage.local`.
+It derives the key from your passphrase using PBKDF2-SHA-256 with 600,000 iterations and a random
+salt. Each write uses a new random IV. The encrypted data, salt and IV are stored locally. Postcat
+does not store the passphrase or key. Saved requests are readable in the panel while unlocked.
+Locking the collection drops the key from the panel, and you need the passphrase to unlock it
+again. The passphrase cannot be recovered.
+
+Collections from earlier versions may still be stored as plain text. When you set up a passphrase
+for an existing collection, Postcat encrypts it and replaces the old value only after saving succeeds.
+You can delete requests in the Saved tab. Uninstalling the extension removes its extension storage.
+
+Postcat stores settings such as capture consent, appearance and layout separately in this browser
+profile. Filter text stays in the open panel. Postcat ignores legacy stored filters and removes
+them the next time settings are saved. Postcat does not sync the collection or settings to the cloud.
 
 Copying a request or response places it on your clipboard. Saving a response as a file writes it
 to the location managed by your browser. These copies remain under your control and are not
@@ -61,19 +74,20 @@ extension at the selected target origin and removed after the send.
 
 HTML responses are shown as source by default. If you choose HTML Preview, the sandboxed frame
 blocks scripts but may load images, stylesheets and other resources referenced by that HTML.
-Those resource requests can contact the original server or other hosts named in the response,
-which may receive network information and process it under their own policies. Other response
-previews use the response data already held by Postcat.
+Chrome can contact hosts to load the resources referenced by the page while HTML Preview is active.
+Relative resource URLs resolve against the response URL for a replay or the current request URL
+for a recorded response. Hosts may receive network information and process it under their own
+policies. Other response previews use the response data already held by Postcat.
 
 ## Permissions
 
-- **Access to all sites (`<all_urls>`):** allows you to replay requests to the HTTP or HTTPS
-  hosts you choose, including local development servers, and read their responses. It is not
-  used to monitor unrelated tabs.
+- **HTTP and HTTPS host access (`http://*/*`, `https://*/*`):** allows you to replay requests to
+  the hosts you choose, including local development servers, and read their responses. Postcat
+  captures page traffic through the DevTools API for the inspected tab.
 - **`declarativeNetRequestWithHostAccess`:** applies headers that the Fetch API cannot set
   directly, such as Cookie, Origin and User-Agent, during a replay. Rules are temporary and
   limited to requests initiated by the extension at the target origin.
-- **`storage`:** saves your collection and panel preferences locally.
+- **`storage`:** saves the encrypted collection and panel preferences locally.
 
 Postcat's executable JavaScript is bundled with the extension. It does not download or execute
 remote application code. HTML Preview does not allow response scripts to execute.

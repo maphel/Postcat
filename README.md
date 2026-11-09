@@ -13,15 +13,15 @@ inspecting, lets you edit and resend them, and keeps the ones you need in a coll
 
 The same two views in the dark appearance: [bottom](docs/screenshot-dark.png), [side](docs/screenshot-side-dark.png).
 
-- **Capture** – every request of the inspected tab, with its response body. "Import log" adds
-  what DevTools recorded before the panel was opened.
+- **Capture** – allow Postcat to record requests and response bodies from the inspected tab.
+  "Import log" adds what DevTools recorded before the panel was opened.
 - **Edit** – method, URL, query params (table), headers (table or bulk text), body with live
   JSON validation. Paste a cURL command to import it; copy any request as cURL.
 - **Send** – from the extension, so CORS does not apply and headers like `Cookie`, `Origin` or
   `User-Agent` can be set. Compare the recorded response with the new one.
 - **Inspect** – JSON with syntax colours, images, SVG, video, audio, PDF, fonts, HTML (sandboxed),
   hex for anything else. Search with ⌘F, save the body as a file.
-- **Keep** – a saved collection with autosave and undo.
+- **Keep** – an encrypted saved collection with a passphrase, autosave and undo.
 
 Works in Chrome, Brave and other Chromium browsers (version 116 or newer). Saved requests and
 settings stay in your browser: no backend, no telemetry. Replays contact the servers you choose;
@@ -40,15 +40,29 @@ After updating the code, reload the extension on `chrome://extensions`, then clo
 
 ## Usage
 
-**Recording** is on by default (the dot next to the Captured / Saved tabs pauses it). The options
-menu (filter icon) holds the **XHR / Fetch only** switch (turn it off to record images, fonts and
-documents), **Import DevTools log**, **Clear captured** and the **Appearance** setting (Light,
-Dark or System, which follows DevTools' theme); its last line shows the installed version
-(`Postcat 0.1.0`). The **filter** matches `METHOD url` as
-plain text or `/regex/`. The **Captured** and **Saved** tabs above the list (with their counts)
-switch the collection with one click.
+**Recording** starts after you click the dot next to the Captured / Saved tabs and choose
+**Allow capture**. Importing the DevTools log also requires this choice. Postcat remembers your
+consent and starts recording when you reopen the panel. Click the dot again to pause. The options
+menu (filter icon) holds the **XHR / Fetch only** switch (turn it off to record other request
+types), **Import DevTools log**, **Clear captured** and the **Appearance** setting (Light, Dark or
+System, which follows DevTools' theme). Its last line shows the installed version. The **filter**
+matches `METHOD url` as plain text or `/regex/` and stays in the open panel. The **Captured** and
+**Saved** tabs above the list switch between the two collections.
 Captured requests are capped at 1,000 entries, including duplicates and restored entries; the
 request currently open in the editor is kept.
+
+**Saved collection.** Choose **Set up collection** in the Saved tab, or save a captured request
+to open setup. Choose and confirm a passphrase of at least 16 characters. Postcat encrypts the
+collection before writing it to local storage. If you have saved requests from an earlier version,
+setup encrypts the existing collection and replaces the old plain text after saving succeeds.
+Before closing DevTools after an edit, wait for **Saving…** to clear or select **Lock collection**
+in the Saved tab and wait for the lock to finish. Reopening DevTools requires unlocking again.
+Keep your passphrase safe. Postcat cannot recover it.
+
+If an existing collection is already near Chrome's storage limit, its encrypted form may not fit.
+The original collection remains intact. For an unpacked installation, reload your previous
+Postcat build from the same folder, remove unneeded requests, then restore the current build
+and retry setup. Keep the extension installed throughout so Chrome keeps its local data.
 
 **Editing** a captured request marks it with ● in the list; **Reset to recorded** (in the ⋯ menu
 next to Send, together with Duplicate, Copy as cURL and Delete; a right-click on a list row opens
@@ -88,7 +102,7 @@ with **Requests** leading back to the list. Sending in a switched layout reveals
 
 ## How replay works
 
-Requests are sent by the extension's service worker with `<all_urls>` host permission.
+Requests are sent by the extension's service worker with host access limited to HTTP and HTTPS.
 Headers that `fetch()` refuses to set (`Cookie`, `Origin`, `Referer`, `User-Agent`,
 `Accept-Encoding`) are applied through a short-lived `declarativeNetRequest` rule that is
 scoped to the exact target origin and removed after the request.
@@ -108,8 +122,6 @@ scoped to the exact target origin and removed after the request.
 - Chrome keeps no copy of responses a page reads with `fetch().blob()` or streams; Postcat
   offers to send the request again instead.
 - File uploads (multipart bodies) are recorded as text and may not replay byte-exact.
-- Saved requests are stored in `chrome.storage.local` in plain text, including any `Cookie`
-  or `Authorization` headers. Remove headers you do not need before saving on a shared machine.
 - If saved requests cannot be loaded, capture remains available and existing storage is protected
   from replacement. Reopen DevTools to retry; requests edited during this failure are not saved.
 - `Set-Cookie` response headers are hidden by the Fetch API and do not show in replays.
@@ -121,7 +133,7 @@ npm install
 npm run lint        # eslint
 npm test            # unit/regression tests, packaging and isolated release guards (node:test)
 npm run test:e2e    # extension in headless Chromium with a stubbed DevTools API (Playwright)
-npm run test:qa     # additional panel states, cancellation races and body-limit boundaries
+npm run test:qa     # panel states, capture consent, vault, cancellation and body limits
 npm run test:real   # real Chrome with real DevTools, driven over CDP
 npm run check       # all of the above
 npm run pack        # dist/postcat-<version>.zip

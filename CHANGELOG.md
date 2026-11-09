@@ -7,6 +7,12 @@ All notable changes to Postcat are listed here. The format is based on
 
 <!-- Entries go under ### Added / ### Changed / ### Fixed / ### Removed; add only the subsections you need. -->
 
+### Changed
+- Ask for consent before recording or importing network traffic from DevTools.
+- Encrypt saved requests with a passphrase and migrate existing collections during setup.
+- Limit host access to HTTP and HTTPS and keep filter text in the current panel only.
+- Rewrite the Chrome Web Store description around the request debugging workflow.
+
 ## 0.2.1 — 2026-11-04
 
 ### Changed

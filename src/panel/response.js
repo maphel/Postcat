@@ -19,7 +19,16 @@ export const shownBodyText = () => shownText;
 
 export function renderResponse() {
   const item = current();
-  if (!item) return;
+  if (!item) {
+    $('resSource').hidden = true;
+    $('resSource').title = '';
+    $('resSourceLabel').hidden = true;
+    $('resSourceLabel').textContent = '';
+    $('resSourceLabel').title = '';
+    $('viewResStatus').textContent = '';
+    showResponse({ placeholder: 'No response yet.' });
+    return;
+  }
   const sent = state.responses.get(item.id);
   const pending = !!sent?.pending;
   $('sendBtn').textContent = pending ? 'Cancel' : 'Send';

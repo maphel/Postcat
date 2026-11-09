@@ -6,6 +6,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import { chromium } from 'playwright';
+import { createVault } from '../src/lib/vault.js';
 
 const root = path.join(import.meta.dirname, '..');
 
@@ -19,6 +20,7 @@ export function buildExtension() {
   // A stamped checkout (`npm run stamp`) must not leak into the tests: the copy starts unstamped.
   fs.rmSync(path.join(dir, 'src', 'build-info.js'), { force: true });
   fs.copyFileSync(path.join(root, 'test', 'devtools-stub.js'), path.join(dir, 'src', 'stub.js'));
+  fs.writeFileSync(path.join(dir, 'src', 'fixture.html'), '<!doctype html><title>Postcat storage fixture</title>');
   fs.writeFileSync(path.join(dir, 'src', 'harness.html'), fs.readFileSync(path.join(root, 'src', 'panel.html'), 'utf8')
     .replace('<script type="module" src="panel/main.js"></script>', '<script src="stub.js"></script><script type="module" src="panel/main.js"></script>'));
   return { dir, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
@@ -43,17 +45,41 @@ export async function launch(dir) {
 // (`consoleErrors`, including failed resource loads). `harEntry` is installed as a page global before
 // the panel boots, so page.evaluate() callbacks can call it under the same name as the import and
 // hand the result to __emit().
-// `init` (optional JS source) runs before the panel boots, e.g. to break a chrome API on purpose.
-export async function openPanel(ctx, id, { width, height, init = '' }) {
+// `storage` replaces storage before panel boot, if supplied. `init` runs before panel scripts.
+export async function openPanel(ctx, id, { width, height, init = '', storage }) {
   const page = await ctx.newPage();
   const errors = [];
   const consoleErrors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
   await page.setViewportSize({ width, height });
+  if (storage) {
+    await page.goto(`chrome-extension://${id}/src/fixture.html`);
+    await page.evaluate(async (storage) => {
+      await chrome.storage.local.clear();
+      await chrome.storage.local.set(storage);
+    }, storage);
+  }
   await page.addInitScript(`window.harEntry = ${harEntry};\n${init}`);
   await page.goto(`chrome-extension://${id}/src/harness.html`);
   return { page, errors, consoleErrors };
+}
+
+export const TEST_PASSPHRASE = 'Postcat test collection passphrase';
+let emptyVault;
+
+// Existing browser journeys start with a real encrypted empty collection and consent already given.
+export async function vaultFixture() {
+  emptyVault ??= createVault(TEST_PASSPHRASE, []).then(({ record }) => record);
+  return { 'postcat.saved': await emptyVault, 'postcat.settings': { captureConsent: true } };
+}
+
+export async function unlockCollection(page, passphrase = TEST_PASSPHRASE) {
+  await page.click('#collectionSaved');
+  await page.getByRole('button', { name: 'Unlock collection', exact: true }).click();
+  await page.fill('#savedPassphrase', passphrase);
+  await page.click('#savedSubmit');
+  await page.getByRole('button', { name: 'Lock collection', exact: true }).waitFor();
 }
 
 // The list renders on the next animation frame (list.js): resolves once it shows exactly `n` rows.

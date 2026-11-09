@@ -14,14 +14,15 @@ dependencies. `README.md` describes the behaviour; this file describes the code.
 | `src/devtools.html`, `src/devtools.js` | DevTools page (only loads the script); registers the panel and forwards DevTools' search bar to `window.postcatSearch` |
 | `src/panel.html`, `src/panel.css` | Panel markup and styles; colours only via custom properties in `:root` / `:root.dark`. Three layouts (wide / medium / narrow) keyed off `data-layout`, `data-screen` and `data-view` on `.app`; menus are `[popover]` elements |
 | `src/panel/main.js`, `actions.js` | Entry point: event wiring, shortcuts, boot; user actions that change the selection or which items exist |
-| `src/panel/state.js`, `storage.js` | Single `state` object and selectors; `chrome.storage.local` with validation and debounced writes |
+| `src/panel/state.js`, `storage.js` | Single `state` object and selectors; validated `chrome.storage.local`, encrypted saved requests and debounced preferences |
+| `src/panel/capture-consent.js`, `vault-ui.js` | First-use capture and import consent; setup, migration and unlock prompts for saved requests |
 | `src/panel/capture.js`, `sending.js` | HAR entries → items (dedupe by occurrence, import), shared `trimCaptured` cap for capture/duplicate/undo; `send` / `cancelSend` / `abandonSend` |
 | `src/panel/list.js`, `editor.js`, `kv-editor.js` | Request list (rAF-batched), editor tabs, key/value table |
 | `src/panel/response.js`, `search.js`, `layout.js`, `dom.js` | Response rendering and previews, ⌘F search, layout modes from the panel width (ResizeObserver), narrow list/detail screens, Request/Response switcher, appearance, resizers; DOM helpers, toast, popover menus |
-| `src/lib/` | Pure helpers (`headers`, `url`, `har`, `curl`, `json`, `body`, `format`; `index.js` re-exports). No DOM, no `chrome`. Shared by panel, worker and tests |
+| `src/lib/` | Helpers for headers, URLs, HAR, cURL, JSON, bodies, formatting and vault encryption. No DOM, no `chrome`. Shared by panel, worker and tests |
 | `test/*.test.js` | Unit tests (`node:test`): `lib.test.js` covers `src/lib`, `regressions.test.js` pins fixed bugs, `pack.test.js` checks the zip, `release.test.js` exercises release guards in disposable local repositories |
 | `test/e2e.js`, `test/real-devtools.js` | Playwright e2e against the stubbed `chrome.devtools`; real Chrome + DevTools over CDP |
-| `test/qa.js`, `test/worker-qa.js` | Additional DOM state/boundary checks and real-worker replay/cancellation/body-limit regressions; included by `npm run test:e2e`, separately runnable with `npm run test:qa` |
+| `test/qa.js`, `test/worker-qa.js`, `test/vault-qa.js` | Browser checks for panel states, real-worker replay and cancellation, and capture consent and collection encryption; included by `npm run test:e2e`, separately runnable with `npm run test:qa` |
 | `test/harness.js`, `test/devtools-stub.js` | Builds and launches the extension for e2e and the screenshot script, with shared waits (`waitForRows`, `waitForSendDone`); the fake `chrome.devtools` the harness page loads before the panel |
 | `scripts/pack.js`, `scripts/screenshot.js` | Zip for distribution (excludes `src/build-info.js`; `test/pack.test.js` checks that); renders README images (`docs/screenshot*.png`: bottom and side docking, light and dark) or `--store` screenshots (1280×800 and 640×400) through the harness |
 | `docs/privacy.md`, `docs/store/` | Privacy policy, Chrome Web Store listing text and submission checklist, permission explanations, and store screenshots |
@@ -34,7 +35,8 @@ dependencies. `README.md` describes the behaviour; this file describes the code.
 | `AGENTS.md`, `CLAUDE.md`, `LESSONS_LEARNED.md` | This file (`CLAUDE.md` is a symlink to it); append-only incident log |
 
 Module graph (top to bottom, acyclic): `main` → `actions` → `editor` / `sending` / `capture` →
-`response` / `list` → `search` / `layout` / `storage` / `kv-editor` → `dom` / `state` / `lib`.
+`response` / `list` → `vault-ui` / `capture-consent` / `search` / `layout` / `kv-editor` →
+`storage` → `dom` / `state` / `lib`.
 `response.js` requests a re-send through the `postcat:send` DOM event rather than importing `sending.js`.
 
 ## Rules
@@ -58,6 +60,10 @@ Module graph (top to bottom, acyclic): `main` → `actions` → `editor` / `send
 10. Tests reach panel internals only through the DOM, and the worker only through `self.postcatSend`.
     Read-only inspection of the worker's DNR rules (`chrome.declarativeNetRequest.getSessionRules`)
     is allowed; tests never add or remove rules themselves.
+11. Register capture and read the DevTools log only after capture consent. Captures, responses
+    and filter text stay in the panel. Write saved request data only through the encrypted
+    collection; keep the derived key in the unlocked panel and replace legacy data only after
+    successful encryption.
 
 ## Workflow
 

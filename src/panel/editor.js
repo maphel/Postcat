@@ -1,7 +1,7 @@
 // The request editor: the narrow navigation row, URL bar, params/headers/body tabs, status line.
 import { parseHeaders, textToRows, rowsToText, urlToParams, paramsToUrl, jsonError, expectsJson } from '../lib/index.js';
 import { state, current, isEdited, defaultName, METHODS } from './state.js';
-import { persistSavedSoon } from './storage.js';
+import { persistSaved } from './storage.js';
 import { $ } from './dom.js';
 import { createKvEditor } from './kv-editor.js';
 import { renderList } from './list.js';
@@ -10,7 +10,7 @@ import { applyScreen } from './layout.js';
 
 // Called after any edit of the current item: autosave, counters, list badges.
 export function afterEdit(item) {
-  if (item.kind === 'saved') persistSavedSoon();
+  if (item.kind === 'saved') persistSaved();
   renderEditState();
   renderList();
 }
@@ -44,8 +44,21 @@ export function renderEditor() {
   const item = current();
   $('emptyState').hidden = !!item;
   $('editor').hidden = !item;
+  $('editor').inert = item?.kind === 'saved' && state.savedLocking;
   applyScreen();
-  if (!item) return;
+  renderContextName();
+  if (!item) {
+    // A hidden editor must not retain the last saved request or its response after locking.
+    $('method').replaceChildren();
+    $('method').className = '';
+    for (const id of ['url', 'headers', 'body']) $(id).value = '';
+    for (const id of ['reqParamCount', 'reqHeaderCount', 'reqBodyMark', 'bodyStatus']) $(id).textContent = '';
+    $('bodyStatus').title = '';
+    paramsKv.set([]);
+    headersKv.set([]);
+    renderResponse();
+    return;
+  }
 
   const select = $('method');
   const methods = METHODS.includes(item.method) ? METHODS : [...METHODS, item.method];
@@ -53,7 +66,6 @@ export function renderEditor() {
   select.value = item.method;
   select.className = `m-${item.method.toLowerCase()}`;
   $('url').value = item.url;
-  renderContextName();
 
   const saved = item.kind === 'saved';
   // Saved items autosave: the bookmark stays (filled) so the row keeps its shape, but does nothing.
@@ -77,10 +89,10 @@ export function renderEditor() {
 // full URL in its title). Read-only; saved names are edited in the list row (list.js).
 export function renderContextName() {
   const item = current();
-  if (!item) return;
   const name = $('contextName');
-  name.textContent = item.kind === 'saved' ? item.name || defaultName(item) : pathOf(item.url);
-  name.title = item.url;
+  if (!item) name.textContent = '';
+  else name.textContent = item.kind === 'saved' ? item.name || defaultName(item) : pathOf(item.url);
+  name.title = item?.url || '';
 }
 
 function pathOf(url) {

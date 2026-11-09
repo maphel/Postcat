@@ -1,8 +1,8 @@
 # Chrome Web Store submission
 
-This folder prepares the first manual, **Unlisted** submission for
-[issue #17](https://github.com/maphel/Postcat/issues/17). It does not publish an item or automate
-uploads. Keep the listing, privacy policy and dashboard declarations aligned with the code.
+This folder contains the listing materials and checklist for the manual Chrome Web Store submission
+tracked in [issue #17](https://github.com/maphel/Postcat/issues/17). Keep the listing, privacy policy
+and dashboard declarations aligned with the code.
 
 ## Initial draft snapshot
 
@@ -19,7 +19,19 @@ Prepared in the Developer Dashboard on 4 November 2026, before the final data-us
   The dashboard's final validation reports one blocker: the developer-policy data-use confirmation,
   represented by the three unchecked certifications. Unselected categories are not themselves a
   dashboard validation error; they still need the maintainer's substantive review.
-- Nothing has been submitted for review or published.
+- At this point, nothing had been submitted for review or published.
+
+## Review outcome and resubmission
+
+On 5 November 2026, the Chrome Web Store rejected the submission for keyword spam (Yellow Argon).
+The notice identified the list of response preview formats in the detailed description. The
+revised description explains the debugging workflow in prose. [Google's Yellow Argon guidance](https://developer.chrome.com/docs/webstore/troubleshooting#keyword-stuffing).
+
+Resubmit the existing item with the tested ZIP for the next release. It asks for consent before
+capture or import, encrypts saved requests and limits host access to HTTP and HTTPS. Use the revised
+[detailed description](long-description.txt), [permission explanations](permissions.md) and
+[reviewer instructions](test-instructions.txt). Verify that the public privacy policy describes
+the version you submit.
 
 ## Files to upload or copy
 
@@ -51,8 +63,8 @@ An optional promotional tile can be added later if wanted.
 
 The code review recommends selecting **Authentication information**, **Web history**,
 **User activity** and **Website content**. Postcat accesses authentication headers, request URLs,
-request/response content and network activity for its explicit DevTools monitoring function.
-These are local data accesses even though no telemetry is sent to the developer.
+request/response content and network activity for request debugging after the user allows capture.
+Local processing and encrypted storage still require accurate disclosure.
 
 The review recommends leaving **Personally identifiable information**, **Health information**,
 **Financial and payment information**, **Personal communications** and **Location** unselected:
@@ -84,9 +96,10 @@ preparation and has not been enabled.
 - [ ] Complete the dashboard's trader/non-trader self-declaration as the maintainer, including
   any required public contact details. This is a legal account declaration, not an extension setting.
 - [ ] Run `npm run check` and `npm run pack`; inspect the resulting ZIP and version.
-- [ ] Create a new item and upload that ZIP; do not upload the repository or the screenshots inside it.
-- [ ] Copy the listing text, choose a language/category and upload the icon and screenshots.
+- [ ] Open the existing item and upload the tested ZIP with the new version.
+- [ ] Replace the detailed description and verify the language, category, icon and screenshots.
 - [ ] Enter the public privacy policy URL, single purpose and permission justifications.
+- [ ] Replace the test instructions with the steps for consent and the encrypted collection.
 - [ ] Review each data-use category against the policy and actual behavior. Local-only processing
   still requires accurate disclosure: captured URLs, content and credentials may correspond to
   Web history, Website content and Authentication information. Generic request/response payloads
@@ -95,11 +108,10 @@ preparation and has not been enabled.
   definitions and explain this local, user-directed debugging use in reviewer notes.
 - [ ] Declare no remote executable code; disclose referenced HTML Preview resources in the policy.
 - [ ] Review the dashboard's data-use certifications against the policy before checking them.
-- [ ] Set visibility to **Unlisted** and review all validation messages and account requirements.
+- [ ] Verify the intended **Public** visibility and review all validation messages and account requirements.
 - [ ] If review should not make the listing live automatically, select deferred publishing when
   the dashboard offers it and verify the resulting publication state.
-- [ ] Submit for review when the maintainer is ready. Unlisted items still require store review;
-  anyone with the resulting link can access the listing.
+- [ ] Resubmit for review when the maintainer is ready.
 - [ ] Record the item ID, resulting store URL and review outcome in issue #17.
 
 Do not add upload credentials to the repository. Automated release uploads are a later step,

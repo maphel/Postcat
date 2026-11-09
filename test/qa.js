@@ -1,6 +1,6 @@
 // Additional DOM-level state and boundary checks. Run with npm run test:qa.
 import assert from 'node:assert/strict';
-import { buildExtension, launch, openPanel, harEntry, waitForRows } from './harness.js';
+import { buildExtension, launch, openPanel, harEntry, waitForRows, vaultFixture, unlockCollection } from './harness.js';
 
 let passed = 0;
 function check(name, actual, expected) {
@@ -14,7 +14,9 @@ let ctx;
 try {
   const launched = await launch(extension.dir);
   ctx = launched.ctx;
-  const { page, errors } = await openPanel(ctx, launched.id, { width: 1300, height: 600 });
+  const { page, errors } = await openPanel(ctx, launched.id, { width: 1300, height: 600, storage: await vaultFixture() });
+  await unlockCollection(page);
+  await page.click('#collectionCaptured');
   const emit = async (o) => {
     await page.evaluate((o) => __emit(harEntry(o)), o);
     await page.waitForFunction((url) => [...document.querySelectorAll('#requestList li[data-id]')].some((li) => li.title.includes(url)), o.url);
@@ -169,17 +171,21 @@ try {
 
   const early = await openPanel(ctx, launched.id, { width: 380, height: 480, init: `
     chrome.storage.local.get = () => new Promise((resolve) => {
-      window.__qaFinishLoad = () => resolve({ 'postcat.settings': { xhrOnly: false, tab: 'captured' } });
+      window.__qaFinishLoad = () => resolve({ 'postcat.settings': { captureConsent: true, xhrOnly: false, tab: 'captured' } });
     });
   ` });
   await early.page.evaluate(() => {
-    __emit(harEntry({ url: 'https://qa.test/early.png', type: 'image', mime: 'text/plain', content: 'buffered' }));
+    __emit(harEntry({ url: 'https://qa.test/early.png', type: 'image', mime: 'text/plain', content: 'before settings' }));
     window.__qaFinishLoad();
   });
+  await early.page.waitForFunction(() => document.getElementById('recordBtn').getAttribute('aria-pressed') === 'true'
+    && document.getElementById('xhrOnly').getAttribute('aria-checked') === 'false');
+  check('nothing is captured before stored consent loads', await early.page.locator('#requestList li[data-id]').count(), 0);
+  await early.page.evaluate(() => __emit(harEntry({ url: 'https://qa.test/consented.png', type: 'image', mime: 'text/plain', content: 'after settings' })));
   await waitForRows(early.page, 1);
   await early.page.locator('#requestList li[data-id]').click();
   await early.page.click('#viewTabs button[data-view=response]');
-  check('early captures wait for stored capture preferences', await early.page.textContent('#resBody'), 'buffered');
+  check('capture starts with the stored type filter after consent loads', await early.page.textContent('#resBody'), 'after settings');
   check('early capture panel has no uncaught errors', early.errors, []);
   await early.page.close();
 
