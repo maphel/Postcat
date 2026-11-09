@@ -5,9 +5,11 @@ Privacy practices field in the Developer Dashboard.
 
 ## storage
 
-Postcat stores the user's saved request collection and panel preferences in chrome.storage.local.
-Saved records contain only the request name, method, URL, headers and body. Preferences include
-appearance, filters, tabs and layout. Data is not synchronized or sent to the developer.
+Postcat stores the user's encrypted request collection and panel preferences in chrome.storage.local.
+Saved requests contain the name, method, URL, headers and body. Postcat encrypts them with a key
+derived from the user's passphrase and keeps the key in the unlocked panel. Preferences include
+capture consent, appearance, tabs and layout. Filter text stays in memory. Storage stays in the
+user's browser profile.
 
 ## declarativeNetRequestWithHostAccess
 
@@ -17,15 +19,15 @@ each replay. The rule is limited to requests initiated by this extension, with t
 the extension ID as initiatorDomains, the exact target origin and the xmlhttprequest resource
 type. Sends are serialized and the rule is removed in finally. It does not modify page traffic.
 
-## Host permission: <all_urls>
+## Host permissions: `http://*/*` and `https://*/*`
 
 Postcat is a general-purpose HTTP debugging client. The user chooses arbitrary HTTP or HTTPS
 URLs to replay, including localhost, private development servers and APIs on different hosts.
-Host access lets the extension's service worker send those requests and read their responses
-without the inspected page's CORS restrictions. A fixed domain list would prevent this core
-function. Requests are sent only in response to the user's Send action, with redirects followed;
-the extension does not use this permission to scan or monitor unrelated tabs. HTML Preview can
-also load resources referenced by the response as disclosed in the privacy policy.
+HTTP and HTTPS host access lets the extension's service worker send those requests and read their
+responses without the inspected page's CORS restrictions. A fixed domain list would prevent this
+core function. Replays start with the user's Send action and follow redirects. Recording and log
+import use the inspected tab's DevTools API after consent. HTML Preview can load resources referenced
+by the response as disclosed in the privacy policy.
 
 ## Remote code
 

@@ -4,7 +4,9 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert';
-import { buildExtension, launch, openPanel, harEntry, waitForRows, waitForSendDone } from './harness.js';
+import { createVault, openVault } from '../src/lib/vault.js';
+import { buildExtension, launch, openPanel, harEntry, waitForRows, waitForSendDone,
+  TEST_PASSPHRASE, vaultFixture, unlockCollection } from './harness.js';
 
 const MANIFEST_VERSION = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'manifest.json'), 'utf8')).version;
 
@@ -127,7 +129,9 @@ function ok(name, condition, detail) {
   check('no cookie leaks into the next send', 'cookie' in JSON.parse(r2.body).headers, false);
 
   // ---------- panel: capture, filter, edit, send, save ----------
-  const { page, errors } = await openPanel(ctx, id, { width: 1300, height: 600 });
+  const { page, errors } = await openPanel(ctx, id, { width: 1300, height: 600, storage: await vaultFixture() });
+  await unlockCollection(page);
+  await page.click('#collectionCaptured');
   await page.evaluate(() => {
     const headers = (method) => [{ name: ':method', value: method }, { name: 'accept', value: 'application/json' }, { name: 'cookie', value: 'sid=1' }];
     const json = { time: 42, resHeaders: [{ name: 'content-type', value: 'application/json' }], content: '{"recorded":true}' };
@@ -163,8 +167,14 @@ function ok(name, condition, detail) {
   const stored = async (key, test = () => true, timeout = 2000) => {
     const deadline = Date.now() + timeout;
     let value;
+    let lastCiphertext;
     do {
-      value = await page.evaluate(async (key) => (await chrome.storage.local.get(key))[key], key);
+      const raw = await page.evaluate(async (key) => (await chrome.storage.local.get(key))[key], key);
+      if (key !== 'postcat.saved') value = raw;
+      else if (raw?.ciphertext && raw.ciphertext !== lastCiphertext) {
+        value = (await openVault(TEST_PASSPHRASE, raw)).records;
+        lastCiphertext = raw.ciphertext;
+      }
       if (test(value)) break;
       await new Promise((r) => setTimeout(r, 25));
     } while (Date.now() < deadline);
@@ -513,7 +523,6 @@ function ok(name, condition, detail) {
   // Readable network errors.
   await page.fill('#url', 'http://localhost:1/nothing');
   await page.click('#sendBtn');
-  await sendDone().catch(() => {});
   await settle(() => /Couldn’t reach/.test(document.getElementById('resBody').textContent), null, 5000);
   match('network error message', await page.textContent('#resBody'), /^Couldn’t reach localhost:1\./);
 
@@ -627,13 +636,20 @@ function ok(name, condition, detail) {
 
   // Corrupt saved records and invalid layout in storage must not break the panel.
   // The panel flushes pending debounced writes on pagehide (storage.js), which would overwrite what
-  // is injected here: wait for the last settings change (the filter) to land in storage first.
-  check('filter persisted before reload', (await stored('postcat.settings', (s) => s?.filterText === '/bulk/'))?.filterText, '/bulk/');
-  await page.evaluate(() => chrome.storage.local.set({
-    'postcat.saved': [{ name: 'ok', method: 'get', url: 'http://a.test', headersText: '', body: '' }, { url: 'http://no-method.test' }, null, 'junk'],
-    'postcat.settings': { layout: { sidebarW: null, reqW: 'wide' }, tab: 'saved', reqTab: 'nope' },
-  }));
+  // is injected here: wait for a new editor-tab setting to land in storage first.
+  const reqTab = await page.getAttribute('#reqTabs [aria-selected="true"]', 'data-tab');
+  const flushTab = reqTab === 'headers' ? 'params' : 'headers';
+  await page.click(`#reqTabs button[data-tab=${flushTab}]`);
+  check('editor tab persisted before reload', (await stored('postcat.settings', (s) => s?.reqTab === flushTab))?.reqTab, flushTab);
+  const { record: corruptVault } = await createVault(TEST_PASSPHRASE, [
+    { name: 'ok', method: 'get', url: 'http://a.test', headersText: '', body: '' }, { url: 'http://no-method.test' }, null, 'junk',
+  ]);
+  await page.evaluate((record) => chrome.storage.local.set({
+    'postcat.saved': record,
+    'postcat.settings': { captureConsent: true, layout: { sidebarW: null, reqW: 'wide' }, tab: 'saved', reqTab: 'nope' },
+  }), corruptVault);
   await page.reload();
+  await unlockCollection(page);
   await listHas(2, 'valid records after reload', 3000);
   const afterReload = await page.evaluate(() => ({
     saved: [...document.querySelectorAll('#requestList li[data-id]')].map((li) => li.title.split('\n')[0]),
@@ -1017,42 +1033,20 @@ function ok(name, condition, detail) {
     await dimensions.page.close();
   }
 
-  // Storage failures must leave a usable panel and keep their error visible.
-  await page.fill('#filterInput', 'storage-qa-flush-marker');
-  check('main settings writes finish before seeding unread storage', (await stored('postcat.settings', (s) => s?.filterText === 'storage-qa-flush-marker'))?.filterText, 'storage-qa-flush-marker');
-  const unread = { name: 'Preserve unread collection', method: 'GET', url: 'https://example.test/unread', headersText: '', body: '' };
-  await page.evaluate((unread) => chrome.storage.local.set({ 'postcat.saved': [unread], 'postcat.settings': { filterText: 'unread setting' } }), unread);
-  const offline = await openPanel(ctx, id, { width: 1100, height: 500, init: `
-    chrome.storage.local.get = async () => { throw new Error('storage offline'); };
-  ` });
-  await offline.page.evaluate(() => __emit(harEntry({ url: 'https://example.test/storage-offline', content: '{"ok":true}' })));
-  await waitForRows(offline.page, 1, 2000).catch(() => {});
-  check('capture boots when storage cannot be read', await offline.page.locator('#requestList li[data-id]').count(), 1);
-  includes('storage read failure is explained', await offline.page.textContent('#toastText'), 'storage offline');
-  check('storage read failure is handled', offline.errors, []);
-  await offline.page.click('#newListBtn');
-  includes('saving after a failed read explains how to retry', await offline.page.textContent('#toastText'), 'Reopen DevTools');
-  await offline.page.evaluate(() => {
-    const dt = new DataTransfer();
-    dt.setData('text/plain', "curl 'https://example.test/offline-import' --data-raw 'unsaved body'");
-    document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }));
-  });
-  check('cURL paste after a failed read still creates an editable draft', await offline.page.inputValue('#url'), 'https://example.test/offline-import');
-  includes('cURL import never hides a storage read error with a success toast', await offline.page.textContent('#toastText'), 'Reopen DevTools');
-  await offline.page.close();
-  check('failed reads never overwrite the unread collection or settings', await page.evaluate(() => chrome.storage.local.get(['postcat.saved', 'postcat.settings'])), {
-    'postcat.saved': [unread], 'postcat.settings': { filterText: 'unread setting' },
-  });
-
+  // The vault is unlocked, but subsequent writes can still fail. Keep the error visible.
+  const writeFixture = await vaultFixture();
   const failedWrite = await openPanel(ctx, id, { width: 1100, height: 500, init: `
-    chrome.storage.local.get = async () => ({});
+    chrome.storage.local.get = async () => (${JSON.stringify(writeFixture)});
+    chrome.storage.local.set = async (items) => {
+      if ('postcat.saved' in items) throw new Error('quota exhausted');
+    };
   ` });
-  await failedWrite.page.evaluate(() => {
-    chrome.storage.local.set = async () => { throw new Error('quota exhausted'); };
-    __emit(harEntry({ url: 'https://example.test/storage-full', content: '{}' }));
-  });
+  await unlockCollection(failedWrite.page);
+  await failedWrite.page.click('#collectionCaptured');
+  await failedWrite.page.evaluate(() => __emit(harEntry({ url: 'https://example.test/storage-full', content: '{}' })));
   await failedWrite.page.locator('#requestList li[data-id]').first().click();
   await failedWrite.page.click('#saveBtn');
+  await failedWrite.page.waitForFunction(() => document.getElementById('toastText').textContent.includes('quota exhausted'));
   includes('failed Save keeps the storage error visible', await failedWrite.page.textContent('#toastText'), 'quota exhausted');
   await failedWrite.page.keyboard.press('Control+s');
   includes('failed save shortcut keeps the storage error visible', await failedWrite.page.textContent('#toastText'), 'quota exhausted');

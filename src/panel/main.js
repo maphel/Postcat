@@ -10,12 +10,18 @@ import { send, cancelSend, isSending } from './sending.js';
 import { addCaptured, importEntries } from './capture.js';
 import { onSearch } from './search.js';
 import { initLayout, showScreen, setDetailView, setAppearance, layoutMode } from './layout.js';
+import { initSavedDialog } from './vault-ui.js';
+import { withCaptureConsent } from './capture-consent.js';
 import {
   select, save, duplicate, reset, rename, moveSelection, remove, clearCaptured, copyCurl, newRequest,
-  tryParseCurl, switchTab, setFilter, setRecording,
+  tryParseCurl, switchTab, setFilter, setRecording, toggleSavedCollection,
 } from './actions.js';
 
 // ---------- editor ----------
+
+function sendSelected() {
+  if (!state.savedLocking || current()?.kind !== 'saved') send();
+}
 
 $('url').addEventListener('input', (e) => {
   const item = current();
@@ -43,7 +49,7 @@ $('url').addEventListener('paste', (e) => {
 $('url').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.isComposing) {
     e.preventDefault();
-    send();
+    sendSelected();
   }
 });
 
@@ -95,8 +101,8 @@ $('beautifyBtn').addEventListener('click', () => {
   afterEdit(item);
 });
 
-$('sendBtn').addEventListener('click', () => (isSending() ? cancelSend() : send()));
-document.addEventListener('postcat:send', () => send()); // "Send again" buttons in response notices
+$('sendBtn').addEventListener('click', () => (isSending() ? cancelSend() : sendSelected()));
+document.addEventListener('postcat:send', sendSelected); // "Send again" buttons in response notices
 $('saveBtn').addEventListener('click', save);
 $('dupBtn').addEventListener('click', duplicate);
 $('deleteBtn').addEventListener('click', remove);
@@ -149,17 +155,21 @@ $('saveResBtn').addEventListener('click', saveResponseBody);
 
 // ---------- sidebar ----------
 
-$('recordBtn').addEventListener('click', () => setRecording(!state.recording));
+$('savedToggle').addEventListener('click', toggleSavedCollection);
+$('recordBtn').addEventListener('click', () => {
+  if (state.recording) setRecording(false);
+  else withCaptureConsent(startRecording);
+});
 $('clearBtn').addEventListener('click', clearCaptured);
 
-$('importBtn').addEventListener('click', () => {
+$('importBtn').addEventListener('click', () => withCaptureConsent(() => {
   chrome.devtools.network.getHAR((har) => {
     // getHAR is oldest-first; addCaptured prepends, so newest ends on top.
     const added = importEntries(har?.entries || []);
     switchTab('captured');
     toast(added ? `Imported ${added} request${added === 1 ? '' : 's'}` : 'Nothing new to import');
   });
-});
+}));
 
 function applyXhrOnly() {
   $('xhrOnly').setAttribute('aria-checked', String(state.xhrOnly));
@@ -256,10 +266,11 @@ document.addEventListener('keydown', (e) => {
 const inMenu = (target) => !!target.closest?.('[popover]');
 
 document.addEventListener('keydown', (e) => {
+  if ($('captureConsentDialog').open) return;
   const mod = e.metaKey || e.ctrlKey;
   if (mod && e.key === 'Enter') {
     e.preventDefault();
-    send();
+    sendSelected();
   } else if (mod && e.key.toLowerCase() === 's') {
     e.preventDefault();
     save();
@@ -286,7 +297,7 @@ document.addEventListener('keydown', (e) => {
 
 // Pasting a cURL command anywhere outside an input creates a new saved request.
 document.addEventListener('paste', (e) => {
-  if (isTyping(e.target)) return;
+  if ($('captureConsentDialog').open || isTyping(e.target)) return;
   const parsed = tryParseCurl(e.clipboardData?.getData('text') || '');
   if (parsed === null) return;
   e.preventDefault();
@@ -299,30 +310,35 @@ document.addEventListener('paste', (e) => {
 
 window.postcatSearch = onSearch; // called by devtools.js
 
-let earlyEntries = []; // finished before settings (xhrOnly, tab) were loaded
-chrome.devtools.network.onRequestFinished.addListener((entry) => {
-  if (earlyEntries) {
-    earlyEntries.push(entry);
-    return;
-  }
+function captureFinished(entry) {
   if (state.recording && addCaptured(entry) && state.tab === 'captured') renderList();
-});
+}
+
+let captureListenerRegistered = false;
+function startRecording() {
+  if (!captureListenerRegistered) {
+    chrome.devtools.network.onRequestFinished.addListener(captureFinished);
+    captureListenerRegistered = true;
+  }
+  setRecording(true);
+}
 
 window.addEventListener('pagehide', flushPending);
 
 // Before the stored appearance is known, follow DevTools' theme so the panel doesn't flash white.
 if (chrome.devtools.panels.themeName === 'dark') document.documentElement.classList.add('dark');
 initMenus();
+initSavedDialog(renderList);
 
 loadStorage().then(() => {
-  const buffered = earlyEntries;
-  earlyEntries = null;
-  for (const entry of buffered) addCaptured(entry);
   applyXhrOnly();
   initLayout();
   initList();
   initResponse();
-  setRecording(true);
+  if (state.captureConsent) startRecording();
+  else setRecording(false);
+  $('recordBtn').disabled = false;
+  $('importBtn').disabled = false;
   setFilter(state.filterText);
   switchTab(state.tab);
   renderResTab();

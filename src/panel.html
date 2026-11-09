@@ -21,6 +21,17 @@
   <symbol id="i-table" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M4 10h16M4 14.5h16M10 5v14"/></symbol>
 </svg>
 
+<dialog id="captureConsentDialog" class="saved-dialog" aria-labelledby="captureConsentTitle" aria-describedby="captureConsentHelp">
+  <form method="dialog">
+    <h2 id="captureConsentTitle">Allow network capture?</h2>
+    <p id="captureConsentHelp">Postcat reads URLs, headers, and request and response bodies from the inspected tab so you can inspect, edit and replay requests. These can include credentials. Captures stay in memory unless you save a request. A replay sends the data you choose to the target server.</p>
+    <div class="saved-dialog-actions">
+      <button id="captureConsentCancel" value="cancel" autofocus>Cancel</button>
+      <button id="captureConsentAccept" class="primary" value="allow">Allow capture</button>
+    </div>
+  </form>
+</dialog>
+
 <div class="app" id="app" data-layout="wide" data-screen="detail" data-view="request">
   <aside class="sidebar" id="sidebar" aria-label="Request list">
     <div class="toolbar list-tools" id="listTools">
@@ -30,7 +41,7 @@
         <button type="button" role="tab" id="collectionSaved" data-tab="saved" aria-selected="false" title="Your saved collection">Saved <span id="savedCount" class="count"></span></button>
       </span>
       <span class="push"></span>
-      <button id="recordBtn" class="icon record" type="button" aria-pressed="true" aria-label="Pause recording" title="Pause recording"><span class="dot"></span></button>
+      <button id="recordBtn" class="icon record" type="button" aria-pressed="false" aria-label="Start recording" title="Start recording" disabled><span class="dot"></span></button>
       <button id="newListBtn" class="icon new" type="button" aria-label="New request" title="New empty request"><svg><use href="#i-plus"/></svg><span class="new-label">New</span></button>
     </div>
     <div class="toolbar list-filter">
@@ -42,7 +53,7 @@
       <div id="captureMenu" class="menu" popover role="menu" aria-label="Options">
         <button id="xhrOnly" class="menu-check" type="button" role="menuitemcheckbox" aria-checked="true" title="Record only XHR/fetch requests (no images, scripts, CSS)"><span class="check" aria-hidden="true"><svg><use href="#i-check"/></svg></span>XHR / Fetch only</button>
         <hr>
-        <button id="importBtn" type="button" role="menuitem" title="Add everything DevTools logged before this panel was opened">Import DevTools log</button>
+        <button id="importBtn" type="button" role="menuitem" title="Add everything DevTools logged before this panel was opened" disabled>Import DevTools log</button>
         <button id="clearBtn" type="button" role="menuitem" title="Remove all captured requests">Clear captured</button>
         <hr>
         <div class="menu-row">
@@ -57,6 +68,9 @@
         <!-- Not a menuitem: arrow keys skip it (dom.js). main.js fills in the version and, on a stamped checkout, the build. -->
         <div id="versionLine" class="menu-note">Postcat</div>
       </div>
+    </div>
+    <div id="savedTools" class="toolbar saved-tools" hidden>
+      <button id="savedToggle" type="button" aria-controls="savedDialog">Unlock collection</button>
     </div>
     <ul id="requestList" class="list" role="listbox" aria-label="Requests"></ul>
   </aside>
@@ -99,7 +113,6 @@
         <button id="saveBtn" class="icon" type="button" aria-label="Save to collection" title="Save to collection (⌘/Ctrl + S)"><svg><use href="#i-bookmark"/></svg></button>
         <button id="moreBtn" class="icon" type="button" popovertarget="moreMenu" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" title="More actions"><svg><use href="#i-more"/></svg></button>
       </div>
-
       <!-- Request / Response switcher: shown when the panes cannot sit side by side. -->
       <div class="switcher" id="viewTabs" role="tablist" aria-label="Detail view">
         <button type="button" role="tab" data-view="request" id="viewReqTab" aria-selected="true" aria-controls="reqPane">Request <span id="viewEdited" class="edited-tag" hidden>edited</span></button>
@@ -183,6 +196,21 @@
   <button id="deleteBtn" type="button" role="menuitem" class="danger" title="Delete (Del)">Delete</button>
 </div>
 
+<dialog id="savedDialog" class="saved-dialog" aria-labelledby="savedTitle" aria-describedby="savedHelp">
+  <form id="savedForm" autocomplete="off" novalidate>
+    <h2 id="savedTitle">Unlock collection</h2>
+    <p id="savedHelp"></p>
+    <label>Passphrase <input id="savedPassphrase" type="password" autocomplete="off" autofocus></label>
+    <label id="savedConfirmLabel" hidden>Confirm passphrase <input id="savedConfirm" type="password" autocomplete="off"></label>
+    <p id="savedError" class="saved-error" role="alert"></p>
+    <div class="saved-dialog-actions">
+      <button id="savedCancel" type="button">Cancel</button>
+      <button id="savedSubmit" class="primary" type="submit">Unlock collection</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="savedWriteStatus" class="saved-write-status" role="status"></div>
 <div id="toast" class="toast" role="status">
   <span id="toastText"></span>
   <button id="toastAction" class="link" type="button" hidden></button>

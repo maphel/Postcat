@@ -117,7 +117,7 @@ const { ctx, id } = await launch(dir);
 try {
   fs.mkdirSync(output, { recursive: true });
   for (const { name, width, height } of SIZES) {
-    const { page } = await openPanel(ctx, id, { width, height });
+    const { page } = await openPanel(ctx, id, { width, height, storage: { 'postcat.settings': { captureConsent: true } } });
     await page.evaluate(emitScene, { port: PORT, store });
     await waitForRows(page, store ? 10 : 5);
     // Start light: the stubbed DevTools reports a dark theme, which 'system' would follow.

@@ -7,7 +7,8 @@ export const LAYOUT_LIMITS = { sidebarMin: 180, reqMin: 20, reqMax: 80 };
 export const APPEARANCES = ['system', 'light', 'dark'];
 
 export const state = {
-  recording: true,
+  captureConsent: false,
+  recording: false,
   xhrOnly: true,
   tab: 'captured',
   reqTab: 'params',
@@ -23,6 +24,7 @@ export const state = {
   filter: null,
   captured: [],
   saved: [],
+  savedLocking: false,
   selectedId: null,
   responses: new Map(), // item id -> last send result ({ pending } | { error } | response)
   seen: new Map(),      // HAR key -> number of captured entries with it (see capture.js)

@@ -2,8 +2,9 @@
 // inline rename of a saved request's name.
 import { formatTime, captureInfo } from '../lib/index.js';
 import { state, lists, visibleItems, isEdited, latestResponse, defaultName } from './state.js';
-import { persistSavedSoon } from './storage.js';
+import { persistSaved, savedStatus } from './storage.js';
 import { $, el, statusClass } from './dom.js';
+import { savedCollectionView } from './vault-ui.js';
 
 let frame = 0;
 let scrollToSelected = false;
@@ -46,6 +47,18 @@ export function renderList({ scroll = false } = {}) {
     $('capturedCount').textContent = state.captured.length || '';
     $('savedCount').textContent = state.saved.length || '';
     $('listCount').textContent = items.length || '';
+    const { button } = savedCollectionView();
+    const toggle = $('savedToggle');
+    $('savedTools').hidden = state.tab !== 'saved' || !button;
+    toggle.textContent = state.savedLocking ? 'Locking collection…' : button || '';
+    toggle.disabled = state.savedLocking;
+    if (savedStatus() === 'unlocked') {
+      toggle.removeAttribute('aria-haspopup');
+      toggle.removeAttribute('aria-controls');
+    } else {
+      toggle.setAttribute('aria-haspopup', 'dialog');
+      toggle.setAttribute('aria-controls', 'savedDialog');
+    }
     fitListTools();
   });
 }
@@ -66,7 +79,8 @@ function emptyListItem() {
   let title;
   let text;
   if (state.filter && lists()[state.tab].length) [title, text] = ['No matching requests', 'Try another filter or collection.'];
-  else if (state.tab === 'saved') [title, text] = ['Nothing saved yet', 'Pick a request and hit Save.'];
+  else if (state.tab === 'saved') ({ title, text } = savedCollectionView());
+  else if (!state.captureConsent) [title, text] = ['Recording is off', 'Start recording to capture requests.'];
   else if (!state.recording) [title, text] = ['Recording is paused', 'Resume it to capture new requests.'];
   else [title, text] = ['Waiting for requests…', 'Reload the page or click around.'];
   return el('li', 'empty', '', [el('strong', '', title), text]);
@@ -76,6 +90,7 @@ function renderListItem(item) {
   const selected = item.id === state.selectedId;
   const li = el('li', selected ? 'selected' : '');
   li.dataset.id = item.id;
+  li.dataset.kind = item.kind;
   li.setAttribute('role', 'option');
   li.setAttribute('aria-selected', String(selected));
   li.tabIndex = selected ? 0 : -1;
@@ -142,7 +157,7 @@ export function endRename(commit) {
   const input = $('name');
   if (commit && item && input) {
     item.name = input.value.trim();
-    persistSavedSoon();
+    persistSaved();
   }
   renderList();
   document.dispatchEvent(new CustomEvent('postcat:renamed')); // the narrow navigation row shows the name (editor.js)

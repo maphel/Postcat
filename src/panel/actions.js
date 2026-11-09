@@ -1,13 +1,14 @@
 // User actions that change what's selected or which items exist.
 import { headersToText, toCurl, parseCurl, compileFilter } from '../lib/index.js';
 import { state, lists, current, visibleItems, copyOf, defaultName, nextId } from './state.js';
-import { persistSaved, persistSettings } from './storage.js';
-import { $, toast, copyText } from './dom.js';
+import { lockSaved, savedStatus, persistSaved, persistSettings } from './storage.js';
+import { $, toast, copyText, closeMenus } from './dom.js';
 import { renderList, endRename } from './list.js';
 import { renderEditor } from './editor.js';
 import { clamp, layoutMode, showScreen } from './layout.js';
 import { requestOf, abandonSend } from './sending.js';
 import { trimCaptured } from './capture.js';
+import { ensureUnlocked } from './vault-ui.js';
 
 // `reveal` opens the detail screen in the narrow layout (a click on a row, a new request);
 // keyboard movement through the list keeps the current screen.
@@ -22,7 +23,8 @@ export function select(id, { reveal = false } = {}) {
 
 export async function save() {
   const item = current();
-  if (!item) return;
+  if (!item || !await ensureUnlocked()) return;
+  if (state.savedLocking || !lists()[item.kind].includes(item)) return;
   if (item.kind === 'saved') {
     if (await persistSaved()) toast('Saved');
     return;
@@ -30,16 +32,54 @@ export async function save() {
   const copy = copyOf(item, 'saved');
   state.saved.unshift(copy);
   const saved = await persistSaved();
+  if (!state.saved.includes(copy)) return;
   switchTab('saved');
   select(copy.id);
   if (saved) toast('Saved', { label: 'Rename', run: rename }); // the one place that teaches the rename gesture
+}
+
+export async function toggleSavedCollection() {
+  if (savedStatus() !== 'unlocked') {
+    await ensureUnlocked();
+    return;
+  }
+  if (state.savedLocking) return;
+  endRename(true);
+  state.savedLocking = true;
+  const toggle = $('savedToggle');
+  const restoreFocus = document.activeElement === toggle;
+  toggle.disabled = true;
+  $('editor').inert = current()?.kind === 'saved';
+  closeMenus();
+  renderList();
+  try {
+    const removed = await lockSaved();
+    for (const id of removed) {
+      abandonSend(id);
+      state.responses.delete(id);
+    }
+    if (removed.includes(state.selectedId)) select(null);
+    // Scrub the previous frame immediately, including stale rows awaiting the next list render.
+    for (const row of $('requestList').querySelectorAll('[data-kind=saved]')) row.remove();
+    $('savedCount').textContent = '';
+    toast('Collection locked');
+  } catch (err) {
+    toast(err?.message || 'Couldn’t lock the collection.');
+  } finally {
+    state.savedLocking = false;
+    $('editor').inert = false;
+    renderList();
+    if (restoreFocus) requestAnimationFrame(() => {
+      if (state.tab === 'saved' && document.activeElement === document.body) toggle.focus();
+    });
+  }
 }
 
 // Inline rename of the selected saved request: its list row shows an input (list.js). The narrow
 // layout opens the list screen for it.
 export function rename() {
   const item = current();
-  if (!item || item.kind !== 'saved') return;
+  if (!item || item.kind !== 'saved' || state.savedLocking) return;
   if (state.tab !== 'saved') switchTab('saved');
   if (state.filter && !visibleItems().includes(item)) setFilter(''); // hidden by the filter: show the row to rename
   state.renaming = item.id;
@@ -49,7 +89,7 @@ export function rename() {
 
 export async function duplicate() {
   const item = current();
-  if (!item) return;
+  if (!item || (item.kind === 'saved' && state.savedLocking)) return;
   const copy = copyOf(item, item.kind);
   if (item.kind === 'saved') copy.name = `${copy.name} (copy)`;
   if (item.kind === 'captured') {
@@ -59,6 +99,7 @@ export async function duplicate() {
   const list = lists()[item.kind];
   list.splice(list.indexOf(item), 0, copy);
   const saved = item.kind !== 'saved' || await persistSaved();
+  if (item.kind === 'saved' && !state.saved.includes(copy)) return;
   select(copy.id);
   if (item.kind === 'captured') trimCaptured();
   if (saved) toast('Duplicated');
@@ -84,7 +125,7 @@ export function moveSelection(delta) {
 
 export function remove() {
   const item = current();
-  if (!item) return;
+  if (!item || (item.kind === 'saved' && state.savedLocking)) return;
   const ids = visibleItems().map((i) => i.id);
   const pos = ids.indexOf(item.id);
   const neighbour = ids[pos + 1] ?? ids[pos - 1] ?? null;
@@ -100,6 +141,7 @@ export function remove() {
   toast(`Deleted ${item.kind === 'saved' ? `“${item.name || defaultName(item)}”` : 'request'}`, {
     label: 'Undo',
     run() {
+      if (item.kind === 'saved' && (state.savedLocking || savedStatus() !== 'unlocked')) return;
       const target = lists()[item.kind];
       target.splice(Math.min(index, target.length), 0, item);
       if (response) state.responses.set(item.id, response);
@@ -139,11 +181,12 @@ export function clearCaptured() {
 
 export function copyCurl() {
   const item = current();
-  if (item) copyText(toCurl(requestOf(item)), 'cURL copied');
+  if (item && (item.kind !== 'saved' || !state.savedLocking)) copyText(toCurl(requestOf(item)), 'cURL copied');
 }
 
 // `from` is a parsed cURL command; without it an empty request is created.
-export function newRequest(from) {
+export async function newRequest(from) {
+  if (!await ensureUnlocked() || state.savedLocking) return;
   const item = {
     id: nextId(),
     kind: 'saved',
@@ -155,7 +198,7 @@ export function newRequest(from) {
   };
   state.saved.unshift(item);
   persistSaved().then((saved) => {
-    if (from && saved) toast('Imported from cURL');
+    if (from && saved && state.saved.includes(item)) toast('Imported from cURL');
   });
   setFilter('');
   switchTab('saved');
@@ -188,14 +231,14 @@ export function setFilter(text) {
   state.filter = compileFilter(text);
   $('filterInput').value = text;
   renderList();
-  persistSettings();
 }
 
 export function setRecording(on) {
   state.recording = on;
   const btn = $('recordBtn');
   btn.setAttribute('aria-pressed', String(on));
-  btn.setAttribute('aria-label', on ? 'Pause recording' : 'Resume recording');
-  btn.title = on ? 'Recording · click to pause' : 'Paused · click to resume recording';
+  const label = state.captureConsent ? 'Resume recording' : 'Start recording';
+  btn.setAttribute('aria-label', on ? 'Pause recording' : label);
+  btn.title = on ? 'Recording · click to pause' : label;
   renderList();
 }
