@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Postcat",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "An API client inside Chrome DevTools: capture, edit and replay network requests.",
   "minimum_chrome_version": "116",
   "devtools_page": "src/devtools.html",

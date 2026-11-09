@@ -1,6 +1,6 @@
 {
   "name": "postcat",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "description": "Chrome DevTools extension: capture, edit and replay network requests.",
